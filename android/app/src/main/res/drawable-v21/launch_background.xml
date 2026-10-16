@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native launch background for API 21+ — matches the Flutter Floosy splash. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/floosy_background" />
+
+    <!-- Floosy logo centered, never stretched. -->
+    <item
+        android:width="160dp"
+        android:height="160dp"
+        android:gravity="center"
+        android:drawable="@drawable/floosy_logo" />
+</layer-list>

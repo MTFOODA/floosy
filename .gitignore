@@ -1,0 +1,99 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+**/build/
+/coverage/
+android/local.properties
+android/.gradle/
+android/.kotlin/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+ios/Pods/
+macos/Pods/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Signing keys and local platform credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.mobileprovision
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
+
+# Local analysis artifacts and temporary data
+/analysis*.txt
+/analyze*.txt
+/audit*.txt
+/test*.txt
+/temp_read*.txt
+/fresh_analysis.txt
+/mojibake_final.txt
+/detected_card_repository.snapshot.txt
+/.tmp_detected_bank_card.txt
+/flutter_*.log
+/final_*.log
+/full_test_*.log
+/targeted-tests.log
+/con
+/devtools_options.yaml
+/tool/patch*.py
+/tool/_tail_screen.py
+**/test_write.txt
+lib/features/transactions/presentation/screens/_new_body*.txt
+lib/features/transactions/presentation/screens/_new_screen_body.txt
+lib/features/transactions/presentation/widgets/_filter_tail.txt
+test/__probe.txt
+tool/_expansion_block*.txt
+tool/_sms_ingestion_block.txt
+Thumbs.db
+.DS_Store
+
+# Real device database pulls (contains real financial PII) - never commit
+.diag/
+test/fixtures/device_floosy.db*
