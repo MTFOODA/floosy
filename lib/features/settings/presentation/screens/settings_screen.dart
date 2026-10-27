@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'ios_bank_messages_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:floosy/features/settings/presentation/cubit/bank_mappings_cubit.dart';
@@ -44,6 +46,18 @@ class SettingsScreen extends StatelessWidget {
               _buildSectionLabel(context, l['sectionAccount']),
               const SizedBox(height: 10),
               _buildAccountCard(context, l),
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const Icon(Icons.sms_outlined),
+                  title: Text(l['iosSmsTitle']),
+                  subtitle: Text(l['iosSmsSettingsHint']),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                          builder: (_) => const IosBankMessagesScreen())),
+                ),
+              ],
               const SizedBox(height: 28),
               _buildLogoutButton(context, l),
               const SizedBox(height: 24),

@@ -1,4 +1,8 @@
 import '../data/services/transaction_movement_reconciler.dart';
+import 'package:flutter/foundation.dart';
+import '../core/services/ios_bank_message_bridge.dart';
+import '../data/services/ios_bank_message_repository.dart';
+import '../domain/repositories/sms_repository.dart';
 import '../core/utils/app_logger.dart';
 import 'app_repositories.dart';
 import '../config/sms_import_config.dart';
@@ -317,6 +321,33 @@ class AppDependencies {
     return service;
   })();
 
+  late final SmsRepository smsRepository = _createSmsRepository();
+  SmsRepository _createSmsRepository() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+      return smsPollingService;
+    }
+    return IosBankMessageRepository(
+      bridge: const IosBankMessageBridge(),
+      isProcessed: processedSmsLocalDataSource.isProcessed,
+      process: (userId, message) async {
+        List<Bank> banks;
+        try {
+          banks = await queries.getBanks().timeout(const Duration(seconds: 8));
+        } catch (_) {
+          banks = const [];
+        }
+        return smsTransactionProcessor.process(
+          userId: userId,
+          sender: message.sender,
+          smsContent: message.body,
+          receivedAt: message.receivedAt,
+          knownBanks: banks,
+        );
+      },
+      onChanged: () => onDataChanged(),
+    );
+  }
+
   late final TransactionDataResetService transactionDataResetService = (() {
     return TransactionDataResetService(
       transactionLocal: transactionLocalDataSource,
@@ -360,10 +391,10 @@ class AppDependencies {
       transactions: transactionRepository,
       cash: cashWalletRepository,
       queries: queries,
-      sms: smsPollingService,
+      sms: smsRepository,
       mappings: bankSenderMappingStore);
   Future<void> close() async {
-    smsPollingService.stop();
+    smsRepository.stop();
     await appDatabase.close();
   }
 }

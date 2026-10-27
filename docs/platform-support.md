@@ -13,7 +13,7 @@
 | Reports | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Alerts & Badges | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AI Chat | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SMS Auto Tracking | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Direct SMS Inbox Tracking | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Manual Transactions | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Offline Local DB | ✅ | ✅ | ✅¹ | ✅ | ✅ | ✅ |
 | Notifications | ✅ | ✅ | Limited² | Appropriate | Appropriate | Appropriate |
@@ -33,8 +33,10 @@
 - Material 3 design, supports phone/tablet/desktop (Chromebook)
 
 ### iOS
-- No SMS access (Apple restricts this)
-- Manual transaction entry as primary input
+- No direct access to the SMS inbox or historical SMS
+- iOS 16+ App Intent for user-configured Shortcuts bank message import; queued messages are processed while Floosy is open
+- Manual transaction entry and copied-message import
+- See [iPhone bank message setup and validation limits](ios-bank-messages.md)
 - `local_auth` for biometric lock (Face ID / Touch ID)
 
 ### Web
@@ -65,7 +67,7 @@
 | Platform | Minimum | Target |
 |---|---|---|
 | Android | API 21 (Android 5.0) | API 36 (Android 16) |
-| iOS | 12.0 | Latest |
+| iOS | 13.0 (bank message App Intent: 16.0+) | Latest |
 | Web | Modern browsers (ES2017+) | — |
 | Windows | Windows 10 (1809+) | Windows 11 |
 | macOS | 10.15 (Catalina) | Latest |

@@ -2,9 +2,9 @@
 
 ## SMS support
 
-Floosy's SMS inbox reader uses an Android platform channel. Installing the iPhone build does not enable automatic SMS import. Apple's message filtering extensions do not provide the Android inbox-reading API or permit writing message data into the containing app's shared container. See [Apple's message filtering documentation](https://developer.apple.com/documentation/identitylookup/sms-and-mms-message-filtering).
+Floosy's direct SMS inbox reader is Android-only. On iOS 16+, use the new **Import Bank SMS** action with a Shortcuts Message automation to queue real incoming bank messages locally. Floosy processes them with its existing SMS parser when you open the app. See the [setup and testing guide](ios-bank-messages.md).
 
-The iPhone build can be used to try sign-in, transactions, budgets, items and the other available screens. An iPhone SMS import feature would require a separate, supported input flow.
+This does not grant access to historical SMS or provide unrestricted background financial processing. Apple's message-filter extensions do not provide the Android inbox-reading API. See [Apple's message filtering documentation](https://developer.apple.com/documentation/identitylookup/sms-and-mms-message-filtering).
 
 ## Build the device IPA in Codemagic
 

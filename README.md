@@ -4,7 +4,7 @@ Floosy is a Flutter personal finance app for tracking transactions and expenses,
 
 ## Key features
 
-- Track transactions and expenses, including bank transactions detected from SMS on Android.
+- Track transactions and expenses, including bank SMS detection on Android and Shortcuts-based bank message import on iPhone (iOS 16+).
 - Manage cash balances and reusable expense items.
 - Set budgets and review spending analytics.
 - Use an in-app AI chat interface.
@@ -64,4 +64,4 @@ Build a release APK for Android:
 flutter build apk --release
 ```
 
-To install a personal test build on an iPhone from Windows, see the [iPhone installation guide](docs/iphone-installation.md). Automatic SMS inbox reading is currently implemented for Android only.
+To install a personal test build on an iPhone from Windows, see the [iPhone installation guide](docs/iphone-installation.md). For real incoming messages on iPhone, enable [Shortcuts message import](docs/ios-bank-messages.md). Direct SMS inbox reading is implemented for Android only.

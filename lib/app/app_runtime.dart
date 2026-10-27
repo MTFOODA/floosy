@@ -113,6 +113,10 @@ class AppRuntime {
   }
   String? _userId() => auth.state.userId;
   void _authenticationChanged(AuthenticationState state) {
+    unawaited(sms.bindUser(state.userId).catchError((Object _) {
+      // iOS imports remain unavailable until a later successful binding.
+      // Other account features must still be able to load.
+    }));
     lock.handleAuthentication(
         userId: state.userId,
         event: state.event,
