@@ -93,8 +93,8 @@ class TransactionDataResetService {
 
     // 6. Local item usages (current month).
     final now = DateTime.now();
-    final usages =
-        await moneyLocal.getItemUsages(userId, year: now.year, month: now.month);
+    final usages = await moneyLocal.getItemUsages(userId,
+        year: now.year, month: now.month);
     for (final u in usages) {
       await moneyLocal.deleteItemUsage(u.id);
       counts.itemUsages++;

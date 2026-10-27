@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/transactions/presentation/state/transaction_display_filter.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/app_logger.dart';
-import '../state/transaction_display_filter.dart';
 
 /// Clean start/end DATE + TIME range selector for the Transactions screen.
 ///
@@ -15,16 +15,14 @@ import '../state/transaction_display_filter.dart';
 ///   * it never triggers an SMS scan, never deletes and never recreates
 ///     transactions;
 ///   * "Clear filter" returns the screen to showing ALL stored transactions.
-class TransactionFilterSheet extends ConsumerStatefulWidget {
+class TransactionFilterSheet extends StatefulWidget {
   const TransactionFilterSheet({super.key});
 
   @override
-  ConsumerState<TransactionFilterSheet> createState() =>
-      _TransactionFilterSheetState();
+  State<TransactionFilterSheet> createState() => _TransactionFilterSheetState();
 }
 
-class _TransactionFilterSheetState
-    extends ConsumerState<TransactionFilterSheet> {
+class _TransactionFilterSheetState extends State<TransactionFilterSheet> {
   DateTime? _start;
   DateTime? _end;
   bool _saving = false;
@@ -32,7 +30,7 @@ class _TransactionFilterSheetState
   @override
   void initState() {
     super.initState();
-    final filter = ref.read(transactionDisplayFilterProvider);
+    final filter = context.read<TransactionFilterCubit>().state;
     _start = filter.startDateTime;
     _end = filter.endDateTime;
   }
@@ -233,9 +231,7 @@ class _TransactionFilterSheetState
     }
     setState(() => _saving = true);
     try {
-      ref
-          .read(transactionDisplayFilterProvider.notifier)
-          .setRange(_start!, _end!);
+      context.read<TransactionFilterCubit>().setRange(_start!, _end!);
       logInfo(
           'TransactionsFilterApplied start=$_start end=$_end (display-only, no SMS scan)');
       if (mounted) Navigator.of(context).pop();
@@ -253,7 +249,7 @@ class _TransactionFilterSheetState
   /// Clears the filter -> ALL stored transactions are shown again.
   void _onClear() {
     if (_saving) return;
-    ref.read(transactionDisplayFilterProvider.notifier).clear();
+    context.read<TransactionFilterCubit>().clear();
     logInfo('TransactionsFilterCleared (showing all stored transactions)');
     if (mounted) Navigator.of(context).pop();
   }

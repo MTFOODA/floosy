@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../models/user_model.dart';
+import '../../../domain/entities/user_model.dart';
 
 /// Remote data source for user profile operations.
 /// The email is ALWAYS read-only — it comes from auth.users, not from the
@@ -26,21 +26,24 @@ class ProfileRemoteDataSource {
 
   /// Update editable profile fields. Email is never updated here.
   Future<UserProfile> updateProfile(UserProfile profile) async {
-    final json = profile.toJson();
-    // Never send email back — it's owned by auth.users.
-    json.remove('email');
+    final user = _supabaseClient.auth.currentUser;
+    if (user == null || user.id != profile.id) {
+      throw StateError('An authenticated profile owner is required');
+    }
+    // A profile row can be missing for an older account. Upsert the fields
+    // edited by this screen, preserving all existing account preferences.
     final response = await _supabaseClient
         .from('profiles')
-        .update(json
-          ..remove('created_at')
-          ..remove('updated_at'))
-        .eq('id', profile.id)
+        .upsert({
+          'id': user.id,
+          'full_name': profile.fullName,
+          'phone': profile.phone,
+        }, onConflict: 'id')
         .select()
         .single();
     // Re-attach email from auth.
-    final user = _supabaseClient.auth.currentUser;
     return UserProfile.fromJson(Map<String, dynamic>.from(response))
-        .copyWith(email: user?.email);
+        .copyWith(email: user.email);
   }
 
   /// Update the user's language preference (synced between profiles table

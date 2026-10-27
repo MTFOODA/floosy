@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/item_model.dart';
+import '../../../domain/entities/item_model.dart';
+import '../../../domain/entities/transaction_model.dart' show Transaction;
 
 /// Pocket-cash remote data source. The balance is always derived from the
 /// cash_movements ledger (PostgreSQL function `get_cash_balance`).
@@ -17,6 +18,33 @@ class CashWalletRemoteDataSource {
     if (response is num) return response.toInt();
     if (response is String) return int.tryParse(response) ?? 0;
     return 0;
+  }
+
+  /// The remote schema uses movement_type (in/out), independently of the
+  /// transaction's cash_expense type. A stable id makes retries idempotent.
+  Future<void> ensureExpenseMovement(Transaction transaction) async {
+    final existing = await _supabaseClient
+        .from('cash_movements')
+        .select('id')
+        .eq('user_id', transaction.userId)
+        .eq('reference_type', 'transaction')
+        .eq('reference_id', transaction.id)
+        .limit(1)
+        .maybeSingle();
+    if (existing != null) return;
+    final wallet =
+        await getOrCreateWallet(transaction.userId, transaction.currency);
+    await _supabaseClient.from('cash_movements').upsert({
+      'id': transaction.id,
+      'user_id': transaction.userId,
+      'wallet_id': wallet.id,
+      'type': 'out',
+      'amount_minor': transaction.amountMinor,
+      'description': transaction.notes ?? '',
+      'reference_type': 'transaction',
+      'reference_id': transaction.id,
+      'movement_date': transaction.transactionDate.toUtc().toIso8601String(),
+    }, onConflict: 'id', ignoreDuplicates: true);
   }
 
   Future<CashWallet> getOrCreateWallet(String userId, String currency) async {

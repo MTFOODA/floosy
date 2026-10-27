@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// DISPLAY-ONLY date/time filter for the Transactions screen.
 ///
@@ -65,9 +65,8 @@ class TransactionDisplayFilter {
 ///
 /// Deliberately in-memory only (not persisted): the app always OPENS with
 /// "no filter → show all stored transactions", per the product contract.
-class TransactionDisplayFilterNotifier
-    extends StateNotifier<TransactionDisplayFilter> {
-  TransactionDisplayFilterNotifier() : super(const TransactionDisplayFilter.none());
+class TransactionFilterCubit extends Cubit<TransactionDisplayFilter> {
+  TransactionFilterCubit() : super(const TransactionDisplayFilter.none());
 
   /// Applies a start/end range (both inclusive). Throws [ArgumentError] when
   /// start > end so an invalid selection can never hide data silently.
@@ -75,16 +74,9 @@ class TransactionDisplayFilterNotifier
     if (start.isAfter(end)) {
       throw ArgumentError('Filter start must not be after end');
     }
-    state = TransactionDisplayFilter(startDateTime: start, endDateTime: end);
+    emit(TransactionDisplayFilter(startDateTime: start, endDateTime: end));
   }
 
   /// Removes the filter → the screen shows ALL stored transactions again.
-  void clear() => state = const TransactionDisplayFilter.none();
+  void clear() => emit(const TransactionDisplayFilter.none());
 }
-
-/// The Transactions screen display filter (view-only, never ingestion).
-final transactionDisplayFilterProvider =
-    StateNotifierProvider<TransactionDisplayFilterNotifier,
-        TransactionDisplayFilter>((ref) {
-  return TransactionDisplayFilterNotifier();
-});

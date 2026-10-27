@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../../models/transaction_model.dart';
+import '../../../domain/entities/transaction_model.dart';
 import '../database/app_database.dart' as db;
 
 /// Offline-first storage for expenses, expense items and item usage rows.

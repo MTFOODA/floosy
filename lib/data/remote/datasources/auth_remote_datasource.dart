@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
+import '../../../config/supabase_config.dart';
 
 /// Auth data source backed by Supabase Auth. Identity is always taken from
 /// the session (auth.uid()) — never from client-supplied user ids.
@@ -6,6 +8,13 @@ class AuthRemoteDataSource {
   final SupabaseClient _supabaseClient;
 
   AuthRemoteDataSource(this._supabaseClient);
+
+  Future<bool> signInWithGoogle() => _supabaseClient.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? Uri.base.origin : SupabaseConfig.authRedirectUrl,
+        authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: const {'prompt': 'select_account'},
+      );
 
   Future<AuthResponse> signUp({
     required String email,

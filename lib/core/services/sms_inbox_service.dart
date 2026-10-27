@@ -63,7 +63,8 @@ class SmsInboxService {
       if (untilDate != null) {
         args['untilDateMs'] = untilDate.millisecondsSinceEpoch;
       }
-      final raw = await _channel.invokeMethod<List<dynamic>>('queryInbox', args);
+      final raw =
+          await _channel.invokeMethod<List<dynamic>>('queryInbox', args);
       final messages = <SmsInboxMessage>[];
       for (final entry in raw ?? const []) {
         final map = Map<String, dynamic>.from(entry as Map);

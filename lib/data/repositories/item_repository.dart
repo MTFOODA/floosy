@@ -1,10 +1,11 @@
+import '../../domain/repositories/item_repository.dart' as domain;
 import 'package:uuid/uuid.dart';
-import '../models/item_model.dart';
+import '../../domain/entities/item_model.dart';
 import '../remote/datasources/item_remote_datasource.dart';
 import '../local/datasources/item_local_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class ItemRepository {
+class ItemRepository implements domain.ItemRepository {
   final ItemRemoteDataSource remoteDataSource;
   final ItemLocalDataSource? localDataSource;
 
@@ -14,6 +15,7 @@ class ItemRepository {
   });
 
   /// Get all active items for a user (local-first, then remote sync).
+  @override
   Future<List<Item>> getActiveItems(String userId) async {
     try {
       final remoteItems = await remoteDataSource.getActiveItems(userId);
@@ -31,6 +33,7 @@ class ItemRepository {
   }
 
   /// Get all items including archived for a user.
+  @override
   Future<List<Item>> getAllItems(String userId) async {
     try {
       final items = await remoteDataSource.getAllItems(userId);
@@ -67,6 +70,7 @@ class ItemRepository {
   }
 
   /// Get item by ID
+  @override
   Future<Item?> getItem(String itemId) async {
     try {
       return await remoteDataSource.getItem(itemId);
@@ -77,6 +81,7 @@ class ItemRepository {
   }
 
   /// Create a new item
+  @override
   Future<Item> createItem({
     required String userId,
     required String name,
@@ -121,6 +126,7 @@ class ItemRepository {
   }
 
   /// Update an existing item
+  @override
   Future<Item> updateItem(Item item) async {
     try {
       await localDataSource?.updateItem(item);
@@ -132,6 +138,7 @@ class ItemRepository {
   }
 
   /// Update item price
+  @override
   Future<void> updatePrice({
     required String itemId,
     required int newPriceMinor,
@@ -145,6 +152,7 @@ class ItemRepository {
   }
 
   /// Get price history for an item
+  @override
   Future<List<ItemPriceHistory>> getPriceHistory(String itemId) async {
     try {
       return await remoteDataSource.getPriceHistory(itemId);
@@ -155,6 +163,7 @@ class ItemRepository {
   }
 
   /// Archive an item
+  @override
   Future<void> archiveItem(String itemId) async {
     try {
       await remoteDataSource.archiveItem(itemId);
@@ -170,6 +179,7 @@ class ItemRepository {
   }
 
   /// Deactivate an item
+  @override
   Future<void> deactivateItem(String itemId) async {
     try {
       await remoteDataSource.deactivateItem(itemId);
@@ -184,6 +194,7 @@ class ItemRepository {
   }
 
   /// Delete an item
+  @override
   Future<void> deleteItem(String itemId) async {
     try {
       await localDataSource?.deleteItem(itemId);
@@ -195,6 +206,7 @@ class ItemRepository {
   }
 
   /// Search items by name
+  @override
   Future<List<Item>> searchItems({
     required String userId,
     required String query,
@@ -214,6 +226,7 @@ class ItemRepository {
   }
 
   /// Get items by category
+  @override
   Future<List<Item>> getItemsByCategory({
     required String userId,
     required String categoryId,

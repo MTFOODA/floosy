@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../routing/app_router.dart';
-import '../../../../core/providers.dart';
+import '../../../../routing/app_routes.dart';
 import '../../../../core/localization/app_localizations.dart';
 
-class ForgotPasswordScreen extends ConsumerStatefulWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   late TextEditingController _emailController;
-  bool _isLoading = false;
+  bool get _isLoading => context.read<AuthCubit>().state.working;
   String? _errorMessage;
   bool _isEmailSent = false;
 
@@ -40,12 +39,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     }
 
     setState(() {
-      _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      await ref.read(authRepositoryProvider).resetPassword(email: email);
+      await context.read<AuthCubit>().resetPassword(email: email);
       if (mounted) {
         setState(() => _isEmailSent = true);
       }
@@ -54,15 +52,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         setState(
             () => _errorMessage = '${l['resetEmailFailed']}: ${e.toString()}');
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AuthCubit>();
     final l = AppLocalizations.s(context);
     return Scaffold(
       appBar: AppBar(

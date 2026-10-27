@@ -1,3 +1,4 @@
+import '../../domain/repositories/sms_repository.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Storage is a JSON object under a user-scoped key, so mappings can never
 /// leak between accounts (requirement 2A.6). Survives restart and refresh.
-class BankSenderMappingStore {
+class BankSenderMappingStore implements BankMappingsRepository {
   static String _mapKey(String userId) => 'floosy_bank_sender_map_$userId';
   static String _unknownKey(String userId) => 'floosy_unknown_senders_$userId';
 
@@ -25,6 +26,7 @@ class BankSenderMappingStore {
   }
 
   /// Saves (or updates) sender → bank name.
+  @override
   Future<void> setMapping(String userId, String sender, String bankName) async {
     final prefs = await SharedPreferences.getInstance();
     final map = _decode(prefs.getString(_mapKey(userId)));
@@ -37,6 +39,7 @@ class BankSenderMappingStore {
   }
 
   /// Senders seen in scans whose bank could not be identified.
+  @override
   Future<List<String>> getUnknownSenders(String userId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_unknownKey(userId));

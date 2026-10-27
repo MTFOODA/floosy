@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../../models/item_model.dart';
+import '../../../domain/entities/item_model.dart';
 import '../database/app_database.dart' as db;
 
 /// Offline-first storage for reusable items backed by Drift.

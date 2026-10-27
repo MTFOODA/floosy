@@ -1,23 +1,22 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_design_system.dart';
 import '../../localization/app_localizations.dart';
 import '../../utils/app_logger.dart';
-import '../../../routing/app_router.dart';
+import '../../../routing/app_routes.dart';
 
 /// Premium bottom navigation shared across all main screens.
 /// 5 items: Home, Transactions, AI Agent, Analysis, Settings.
-class FloosyBottomNav extends ConsumerStatefulWidget {
+class FloosyBottomNav extends StatefulWidget {
   final Widget child;
   const FloosyBottomNav({super.key, required this.child});
 
   @override
-  ConsumerState<FloosyBottomNav> createState() => _FloosyBottomNavState();
+  State<FloosyBottomNav> createState() => _FloosyBottomNavState();
 }
 
-class _FloosyBottomNavState extends ConsumerState<FloosyBottomNav> {
+class _FloosyBottomNavState extends State<FloosyBottomNav> {
   int _currentIndex = 0;
 
   static const _routes = [
@@ -176,11 +175,21 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 24,
-                color: isActive
-                    ? FloosyDesign.primaryPurple
-                    : context.fc.textMuted),
+            AnimatedContainer(
+                duration: FloosyDesign.normal,
+                width: 40,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: isActive
+                        ? FloosyDesign.primaryPurple.withValues(alpha: .15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon,
+                    size: 22,
+                    color: isActive
+                        ? FloosyDesign.primaryPurple
+                        : context.fc.textMuted)),
             const SizedBox(height: 4),
             Text(label,
                 maxLines: 1,
@@ -213,13 +222,13 @@ class _AIAgentButton extends StatelessWidget {
           children: [
             // 50px button + 3px gap + 11px label fits comfortably inside the
             // 72px bar — fixes the "Bottom overflowed by 6px" on all devices.
-            Container(
-              width: 50,
-              height: 50,
+            AnimatedContainer(
+              duration: FloosyDesign.normal,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                gradient: isActive ? FloosyDesign.purpleGradient : null,
-                color: isActive ? null : context.fc.elevatedSurface,
-                shape: BoxShape.circle,
+                gradient: FloosyDesign.purpleGradient,
+                borderRadius: BorderRadius.circular(15),
                 border: isActive
                     ? null
                     : Border.all(color: context.fc.borderSubtle),
@@ -228,8 +237,8 @@ class _AIAgentButton extends StatelessWidget {
                         radius: 14, opacity: 0.3)
                     : null,
               ),
-              child: Icon(Icons.smart_toy_rounded,
-                  color: context.fc.textPrimary, size: 24),
+              child: const Icon(Icons.desktop_windows_rounded,
+                  color: Colors.white, size: 22),
             ),
             const SizedBox(height: 3),
             Text(label,

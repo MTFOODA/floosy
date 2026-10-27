@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../routing/app_router.dart';
-import '../../../../core/providers.dart';
+import '../../../../routing/app_routes.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/widgets/auth/auth_brand_header.dart';
-import '../../../../data/models/user_model.dart';
+import '../../../../core/widgets/auth/auth_mode_switch.dart';
 
-class RegisterScreen extends ConsumerStatefulWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   late TextEditingController _nameController;
-  bool _isLoading = false;
+  bool get _isLoading => context.read<AuthCubit>().state.working;
   String? _errorMessage;
   bool _obscurePassword = true;
 
@@ -53,28 +53,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
     setState(() {
-      _isLoading = true;
       _errorMessage = null;
     });
     try {
-      final authResponse = await ref
-          .read(authRepositoryProvider)
+      await context
+          .read<AuthCubit>()
           .signUp(email: email, password: password, fullName: name);
-      // Ensure the profile name is persisted to the profiles table
-      // (in case the DB trigger hasn't been applied yet).
-      final userId = authResponse.user?.id;
-      if (userId != null && name.isNotEmpty) {
-        try {
-          await ref.read(profileRepositoryProvider).updateProfile(
-                UserProfile(id: userId).copyWith(fullName: name),
-              );
-        } catch (_) {
-          // Trigger may have already handled it; ignore.
-        }
-      }
+      // full_name is already sent in signup metadata. Without a confirmed
+      // session, RLS cannot permit a profile update; the signup trigger owns
+      // initial profile creation.
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _errorMessage = null;
         });
         await _showEmailConfirmationDialog(email);
@@ -84,8 +73,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         setState(() =>
             _errorMessage = '${l['registrationFailed']}: ${e.toString()}');
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -222,6 +209,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AuthCubit>();
     final l = AppLocalizations.s(context);
     return Scaffold(
       backgroundColor: context.fc.authBackground,
@@ -234,7 +222,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             children: [
               const SizedBox(height: 50),
               const AuthBrandHeader(),
-              const SizedBox(height: 50),
+              const SizedBox(height: 32),
+              const AuthModeSwitch(register: true),
+              const SizedBox(height: 28),
               if (_errorMessage != null)
                 Container(
                   width: double.infinity,
@@ -262,8 +252,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               _buildButton(l),
               const SizedBox(height: 40),
               Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
                   children: [
                     Text(l['alreadyHaveAccount'], style: context.fc.bodyText),
                     GestureDetector(

@@ -1,3 +1,4 @@
+export '../../domain/entities/image_reference.dart';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/app_logger.dart';
@@ -11,16 +12,6 @@ import '../../core/utils/app_logger.dart';
 /// bucket. A Windows drive path (`C:\...`), an Android/iOS path
 /// (`/data/...`, `/storage/...`, `/var/...`) or any other absolute POSIX path
 /// (`/home/...` on desktop) IS a local file.
-bool isLocalFilePath(String path) {
-  if (path.startsWith('http://') || path.startsWith('https://')) return false;
-  // Windows absolute path like C:\...
-  if (path.length >= 2 && path[1] == ':') return true;
-  // Any other absolute path (Android, iOS, Linux/macOS desktop). Storage
-  // paths are relative, so they never start with a slash.
-  if (path.startsWith('/')) return true;
-  return false;
-}
-
 /// Uploads item images to the `item-images` storage bucket with per-user
 /// folder isolation (`{userId}/{itemId}.{ext}`), matching the RLS policies
 /// in supabase/migrations/021_storage_policies.sql.
@@ -29,6 +20,9 @@ class ItemImageService {
   static const String bucket = 'item-images';
 
   ItemImageService(this._client);
+
+  Future<String?> resolveImage(String reference) =>
+      resolveItemImageUrlAsync(reference, client: _client);
 
   /// Picks nothing itself — receives a local file path from image_picker,
   /// uploads it and returns the storage PATH (not a public URL). The
@@ -122,7 +116,8 @@ String? resolveItemImageUrl(String? imageUrl) {
 /// `Image.network` (which sends no auth header). This returns a
 /// time-limited SIGNED URL whenever the value is a storage path or a public
 /// object URL for this bucket. External URLs pass through unchanged.
-Future<String?> resolveItemImageUrlAsync(String? imageUrl) async {
+Future<String?> resolveItemImageUrlAsync(String? imageUrl,
+    {SupabaseClient? client}) async {
   if (imageUrl == null || imageUrl.trim().isEmpty) return null;
   final trimmed = imageUrl.trim();
 
@@ -144,7 +139,8 @@ Future<String?> resolveItemImageUrlAsync(String? imageUrl) async {
   }
 
   try {
-    return await Supabase.instance.client.storage
+    return await (client ?? Supabase.instance.client)
+        .storage
         .from(ItemImageService.bucket)
         .createSignedUrl(path, 3600);
   } catch (_) {

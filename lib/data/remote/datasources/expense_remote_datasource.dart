@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/transaction_model.dart';
+import '../../../domain/entities/transaction_model.dart';
 
 class ExpenseRemoteDataSource {
   final SupabaseClient _supabaseClient;

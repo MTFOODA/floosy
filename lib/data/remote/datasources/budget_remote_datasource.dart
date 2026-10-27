@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/budget_model.dart';
+import '../../../domain/entities/budget_model.dart';
 
 class BudgetRemoteDataSource {
   final SupabaseClient _supabaseClient;

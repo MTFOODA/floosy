@@ -1,17 +1,20 @@
+import '../../domain/repositories/transaction_repository.dart' as domain;
 import 'dart:async';
 
-import '../models/transaction_model.dart';
+import '../../domain/entities/transaction_model.dart';
 import '../remote/datasources/transaction_remote_datasource.dart';
 import '../local/datasources/transaction_local_datasource.dart';
 import '../remote/datasources/money_remote_datasource.dart';
 import '../remote/datasources/sms_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
-class TransactionRepository {
+
+class TransactionRepository implements domain.TransactionRepository {
   final SmsRemoteDataSource? _smsRemoteDataSource;
   final TransactionRemoteDataSource _remoteDataSource;
   final TransactionLocalDataSource _localDataSource;
   final MoneyRemoteDataSource? _moneyRemoteDataSource;
-  final Future<void> Function(String transactionId)? _deleteTransactionMovements;
+  final Future<void> Function(String transactionId)?
+      _deleteTransactionMovements;
   final Future<void> Function(String transactionId)? _detachSmsTransaction;
   final Future<void> Function(Transaction previous, Transaction next)?
       _reconcileTransactionMovements;
@@ -36,7 +39,28 @@ class TransactionRepository {
   static const Duration _remoteReadTimeout = Duration(seconds: 10);
   static const Duration _remoteWriteTimeout = Duration(seconds: 15);
 
+  /// Used inside a larger local ledger transaction. No network work here.
+  @override
+  Future<void> insertLocally(Transaction transaction) =>
+      _localDataSource.insertTransaction(transaction);
+
+  @override
+  Future<bool> mirrorCreatedTransaction(Transaction transaction) async {
+    try {
+      await _remoteDataSource
+          .createTransaction(transaction)
+          .timeout(_remoteWriteTimeout);
+      return true;
+    } catch (e) {
+      logError(
+          'TRANSACTION_REMOTE_WRITE_FAILED stage=create id=${transaction.id}',
+          e);
+      return false;
+    }
+  }
+
   /// Create a new transaction (first locally, then sync to Supabase).
+  @override
   Future<Transaction> createTransaction({
     required Transaction transaction,
   }) async {
@@ -55,8 +79,10 @@ class TransactionRepository {
       // on the next sync. Never swallow this silently (stage + identity +
       // error type) — this is how the missing transfer_in/transfer_out enum
       // values in Supabase went unnoticed.
-      logError('TRANSACTION_REMOTE_WRITE_FAILED stage=create '
-          'id=${transaction.id} fingerprint=${transaction.fingerprint}', e);
+      logError(
+          'TRANSACTION_REMOTE_WRITE_FAILED stage=create '
+          'id=${transaction.id} fingerprint=${transaction.fingerprint}',
+          e);
       return transaction;
     }
   }
@@ -69,6 +95,7 @@ class TransactionRepository {
   /// reach Supabase (e.g. enum value rejected remotely) made the entire
   /// Transactions page appear empty. The local store is always the base;
   /// remote rows are merged into it.
+  @override
   Future<List<Transaction>> getTransactions({
     required String userId,
     bool syncWithRemote = true,
@@ -113,8 +140,10 @@ class TransactionRepository {
       transactions = await _localDataSource.getTransactionsByUserId(userId);
     } catch (e) {
       // Sync failed (offline / Supabase error / hang) — return local cache.
-      logError('TRANSACTION_SYNC_FAILED stage=remote_read '
-          'falling back to local cache', e);
+      logError(
+          'TRANSACTION_SYNC_FAILED stage=remote_read '
+          'falling back to local cache',
+          e);
     }
 
     return transactions;
@@ -147,6 +176,7 @@ class TransactionRepository {
   }
 
   /// Check for duplicate transaction by fingerprint
+  @override
   Future<bool> isDuplicateTransaction({
     required String userId,
     required String fingerprint,
@@ -166,13 +196,16 @@ class TransactionRepository {
   /// flow) commit locally and mirror to Supabase afterwards via
   /// [mirrorTransactionInBackground]. The remote write is best-effort by design:
   /// a failure is logged and the committed local row stands.
+  @override
   Future<void> updateTransaction({
     required Transaction transaction,
     bool syncRemote = true,
   }) async {
     final matching = (await _localDataSource.getTransactionsByUserId(
       transaction.userId,
-    )).where((row) => row.id == transaction.id).toList();
+    ))
+        .where((row) => row.id == transaction.id)
+        .toList();
     final previous = matching.isEmpty ? null : matching.first;
     await _localDataSource.updateTransaction(transaction);
 
@@ -194,6 +227,7 @@ class TransactionRepository {
   ///
   /// Used by the edit/save path once the local commit is done and the UI has
   /// already been refreshed, so network latency is never on the critical path.
+  @override
   void mirrorTransactionInBackground(Transaction transaction) {
     unawaited(_mirrorTransaction(transaction));
   }
@@ -218,6 +252,7 @@ class TransactionRepository {
   /// exactly as committed, so the repair can never resurrect other stale fields
   /// from the pre-edit object. The remote mirror is fire-and-forget: a repair
   /// that failed remotely must still leave the local database correct.
+  @override
   Future<void> restoreCardIdentity({
     required Transaction transaction,
     required String? cardId,
@@ -235,6 +270,7 @@ class TransactionRepository {
   }
 
   /// Delete a transaction
+  @override
   Future<void> deleteTransaction({
     required String transactionId,
   }) async {
@@ -244,7 +280,8 @@ class TransactionRepository {
       await _moneyRemoteDataSource?.deleteTransactionMovements(transactionId);
       await _smsRemoteDataSource?.deleteTransactionReferences(transactionId);
     } catch (e) {
-      logError('TRANSACTION_REMOTE_MOVEMENT_DELETE_FAILED id=$transactionId', e);
+      logError(
+          'TRANSACTION_REMOTE_MOVEMENT_DELETE_FAILED id=$transactionId', e);
     }
     await _localDataSource.deleteTransaction(transactionId);
 
@@ -256,6 +293,7 @@ class TransactionRepository {
   }
 
   /// Get monthly transactions
+  @override
   Future<List<Transaction>> getMonthlyTransactions({
     required String userId,
     required int year,
@@ -270,6 +308,7 @@ class TransactionRepository {
   /// local store (the authoritative transaction ledger). Range change never
   /// triggers SMS re-detection — transactions are simply shown/hidden by the
   /// current Detection Range (requirement #16).
+  @override
   Future<List<Transaction>> getTransactionsByRange({
     required String userId,
     required DateTime? startDateTime,
@@ -278,8 +317,8 @@ class TransactionRepository {
     int limit = 100,
   }) async {
     // Local rows first — offline-safe, never lost.
-    var transactions = await _localDataSource
-        .getTransactionsByRange(userId, startDateTime: startDateTime, endDateTime: endDateTime);
+    var transactions = await _localDataSource.getTransactionsByRange(userId,
+        startDateTime: startDateTime, endDateTime: endDateTime);
 
     if (!syncWithRemote) return transactions;
 
@@ -305,11 +344,13 @@ class TransactionRepository {
         }
       }
 
-      transactions =
-          await _localDataSource.getTransactionsByRange(userId, startDateTime: startDateTime, endDateTime: endDateTime);
+      transactions = await _localDataSource.getTransactionsByRange(userId,
+          startDateTime: startDateTime, endDateTime: endDateTime);
     } catch (e) {
-      logError('TRANSACTION_SYNC_FAILED stage=remote_read '
-          'falling back to local cache', e);
+      logError(
+          'TRANSACTION_SYNC_FAILED stage=remote_read '
+          'falling back to local cache',
+          e);
     }
 
     return transactions;

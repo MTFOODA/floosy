@@ -1,26 +1,37 @@
-﻿import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/card_appearance_view.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/dashboard/presentation/cubit/finance_cubit.dart';
+import 'package:floosy/features/items/presentation/cubit/items_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/profile_cubit.dart';
+import 'package:floosy/features/transactions/presentation/cubit/sms_cubit.dart';
+import 'package:floosy/core/localization/preferences_cubit.dart';
+import 'package:floosy/core/state/refresh_cubit.dart';
+import 'package:floosy/core/state/load_state.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../../../core/utils/money_formatter.dart';
-import '../../../../data/models/item_model.dart';
-import '../../../../data/models/money_model.dart';
-import '../../../../data/models/detected_card_model.dart';
-import '../../../../core/widgets/common/item_image.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../domain/entities/item_model.dart';
+import '../../../../domain/entities/money_model.dart';
+import '../../../../domain/entities/detected_card_model.dart';
+import '../../../../core/widgets/common/item_avatar.dart';
+import '../../../../core/theme/item_appearance.dart';
+import '../../../../core/widgets/common/finance_panel.dart';
+import '../../../../routing/app_routes.dart';
 import '../widgets/card_selector_section.dart';
 
-class DashboardScreen extends ConsumerStatefulWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> {
   /// Item id currently being purchased Ã¢â‚¬â€ duplicate-tap protection (#27).
   String? _purchasingItemId;
 
@@ -32,13 +43,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   /// Money / Pocket Cash are never recalculated or modified Ã¢â‚¬â€ and no other
   /// card is affected.
   Future<void> _toggleBalanceVisibility(DetectedCard card) async {
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    final repo = ref.read(detectedCardRepositoryProvider);
+    final repo = context.read<CardsCubit>();
     await repo.toggleCardEye(userId, card.id);
     if (!mounted) return;
     // Refresh THIS card's eye provider only.
-    ref.invalidate(cardEyeVisibleProvider(card.id));
+    context.read<CardsCubit>().reload();
   }
 
   String _greetingKey() {
@@ -79,27 +90,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final userId = ref.watch(currentUserIdProvider);
-    final profileAsync = ref.watch(userProfileProvider);
+    final userId = context.watch<AuthCubit>().state.userId;
+    final profileAsync = context.watch<ProfileCubit>().state;
+    context.read<RefreshCubit>().state;
     // Card-specific money figures: when a detected card is selected, My
     // Balance, Pocket Cash and Deducted Money show THAT CARD's values only
     // (scoped by card_last4). No selection Ã¢â€ â€™ explicit zeros.
-    final summaryAsync = ref.watch(selectedCardMoneySummaryProvider);
+    final summaryAsync =
+        context.watch<FinanceCubit>().state.map((data) => data.summary);
     // Surface provider failures during development instead of silently
     // rendering zeros Ã¢â‚¬â€ zero must mean "calculated zero", not "error".
-    ref.listen(selectedCardMoneySummaryProvider, (previous, next) {
-      if (next is AsyncError) {
-        logError('SELECTED_CARD_SUMMARY_FAILED', next.error);
-      }
-    });
-    final itemsAsync =
-        userId != null ? ref.watch(dashboardItemsProvider(userId)) : null;
-    final userName = profileAsync.value?.fullName ?? 'there';
+
+    final itemsAsync = userId != null
+        ? context.watch<ItemsCubit>().state.map((data) => data.active)
+        : null;
+    final userName = profileAsync.value?.fullName ?? l['greetingFriend'];
     return Scaffold(
       backgroundColor: context.fc.background,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            final sms = context.read<SmsCubit>();
+            final finance = context.read<FinanceCubit>();
+            final items = context.read<ItemsCubit>();
             // Requirement #3: pull-to-refresh triggers an IMMEDIATE bank-SMS
             // check through the SAME central pipeline used by the 5-second
             // polling. ANR fix: scanNow() with NO fullScan Ã¢â‚¬â€ it only checks
@@ -107,13 +120,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             // re-read the historical inbox (that full re-read was the main
             // thread blocker behind the MIUI ANR).
             try {
-              await ref.read(smsPollingServiceProvider).scanNow();
+              await sms.scanNow();
             } catch (e) {
               logError('PULL_REFRESH sms scan failed', e);
             }
-            ref.invalidate(moneySummaryProvider);
-            ref.invalidate(selectedCardMoneySummaryProvider);
-            if (userId != null) ref.invalidate(dashboardItemsProvider(userId));
+            await Future.wait([finance.reload(), items.reload()]);
           },
           child: SingleChildScrollView(
             padding: FloosyDesign.horizontalPadding(context)
@@ -123,7 +134,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _buildHeader(userName, l),
                 const SizedBox(height: 20),
-                const DetectedCardsSection(),
+                const DetectedCardsSection(compact: true),
                 const SizedBox(height: 20),
                 _buildBalanceCard(summaryAsync, l),
                 const SizedBox(height: 20),
@@ -141,50 +152,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildHeader(String userName, AppLocalizations l) {
-    return Row(
-      children: [
+    return FinancePanel(
+      colors: const [Color(0xFF0B4667), Color(0xFF137FA8)],
+      child: Row(children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_getFormattedDate(l),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: context.fc.textMuted)),
-              const SizedBox(height: 4),
-              Text('${l[_greetingKey()]},',
-                  style:
-                      TextStyle(fontSize: 15, color: context.fc.textSecondary)),
-              const SizedBox(height: 2),
-              Text('$userName \u{1F44B}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: context.fc.textPrimary)),
-            ],
-          ),
-        ),
-        const _HeaderButton(icon: Icons.notifications_outlined),
-        const SizedBox(width: 12),
-        const _HeaderButton(icon: Icons.info_outline_rounded),
-      ],
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_getFormattedDate(l),
+              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+          const SizedBox(height: 6),
+          Text(l[_greetingKey()],
+              style: const TextStyle(fontSize: 13, color: Colors.white70)),
+          const SizedBox(height: 4),
+          Text('$userName \u{1F44B}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
+        ])),
+        IconButton(
+            tooltip: l['settings'],
+            onPressed: () => context.push(AppRoutes.settings),
+            style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: .12)),
+            icon:
+                const Icon(Icons.tune_rounded, color: Colors.white, size: 21)),
+        IconButton(
+            tooltip: 'Floosy',
+            onPressed: () => showAboutDialog(
+                context: context,
+                applicationName: 'Floosy',
+                applicationVersion: '1.0.0'),
+            icon: const Icon(Icons.info_outline_rounded,
+                color: Colors.white70, size: 21)),
+      ]),
     );
   }
 
-  Widget _buildBalanceCard(AsyncValue summaryAsync, AppLocalizations l) {
+  Widget _buildBalanceCard(LoadState summaryAsync, AppLocalizations l) {
     final balance = summaryAsync.value?.myBalanceMinor ?? 0;
     // The selected card drives BOTH the eye state and the "+" limit.
-    final selectedCard = ref.watch(selectedCardProvider).value;
+    final selectedCard =
+        context.watch<FinanceCubit>().state.map((data) => data.card).value;
 
     // Per-card eye state, read from its OWN provider so toggling one card's
     // visibility never invalidates a money provider or another card.
     final isEyeVisible = selectedCard == null
         ? true
-        : (ref.watch(cardEyeVisibleProvider(selectedCard.id)).value ??
+        : (context.watch<CardsCubit>().eyeVisible(selectedCard.id).value ??
             selectedCard.appearance.eyeVisible);
-
 
     // The "+" button's availability is a BUSINESS RULE read from the money
     // layer rather than recomputed here:
@@ -193,18 +211,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     //   credit card with headroom           -> enabled, capped to that headroom
     //   debit card                          -> enabled (no Fixed Amount concept)
     //   no card selected                    -> disabled
-    final isPlusEnabled =
-        ref.watch(canAddSelectedCardBalanceProvider).value ?? false;
+    final isPlusEnabled = context
+            .watch<FinanceCubit>()
+            .state
+            .map((data) => data.canAddBalance)
+            .value ??
+        false;
 
-    return Container(
-      width: double.infinity,
-      height: 175,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: context.fc.balanceGradient,
-        borderRadius: BorderRadius.circular(FloosyDesign.radiusXL),
-        border: Border.all(color: context.fc.borderSubtle),
-      ),
+    return FinancePanel(
+      height: 138,
+      colors: const [Color(0xFF145574), Color(0xFF1489B7)],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,8 +228,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Row(
             children: [
               Text(l['myBalance'],
-                  style:
-                      TextStyle(fontSize: 14, color: context.fc.textSecondary)),
+                  style: const TextStyle(fontSize: 14, color: Colors.white70)),
               const Spacer(),
               // "Add My Balance" Ã¢â‚¬â€ ICON ONLY (requirement #10). No text
               // label beside the icon; a Tooltip keeps it understandable
@@ -225,14 +240,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                        color:
-                            FloosyDesign.primaryPurple.withValues(alpha: 0.18),
+                        color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(10)),
                     child: Icon(
                       Icons.add_rounded,
-                      color: isPlusEnabled
-                          ? FloosyDesign.brightPurple
-                          : context.fc.textMuted,
+                      color: isPlusEnabled ? Colors.white : Colors.white38,
                       size: 18,
                     ),
                   ),
@@ -247,7 +259,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     isEyeVisible
                         ? Icons.visibility_rounded
                         : Icons.visibility_off_rounded,
-                    color: context.fc.textMuted,
+                    color: Colors.white38,
                     size: 20),
               ),
             ],
@@ -258,14 +270,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 isEyeVisible
                     ? formatMoney(balance)
                     : '\u2022\u2022\u2022\u2022\u2022\u2022',
-                style: context.fc.financialValueLarge),
+                style: context.fc.financialValueLarge
+                    .copyWith(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCards(AsyncValue summaryAsync, AppLocalizations l) {
+  Widget _buildSummaryCards(LoadState summaryAsync, AppLocalizations l) {
     final pocketCash = summaryAsync.value?.pocketCashMinor ?? 0;
     final deducted = summaryAsync.value?.deductedMinor ?? 0;
 
@@ -274,9 +287,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // for a credit card the entire Pocket Cash container is omitted (no empty
     // card, no 0 EGP placeholder, no disabled placeholder). Debit cards keep
     // the existing behaviour.
-    final selectedCard = ref.watch(selectedCardProvider).value;
+    final selectedCard =
+        context.watch<FinanceCubit>().state.map((data) => data.card).value;
     final showPocketCash = selectedCard == null ||
-        (ref.watch(cardPocketCashVisibleProvider(selectedCard.last4)).value ??
+        (context
+                .watch<FinanceCubit>()
+                .state
+                .map((data) => data.pocketCashVisible)
+                .value ??
             true);
 
     return Row(
@@ -317,11 +335,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Future<void> _showAddBalanceDialog() async {
     final l = AppLocalizations.s(context);
     // Capture immutable inputs while this widget is alive.
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    final selectedCard = ref.read(selectedCardProvider).value;
+    final selectedCard =
+        context.read<FinanceCubit>().state.map((data) => data.card).value;
     final selectedCardLast4 =
-        selectedCard?.last4 ?? ref.read(selectedCardLast4Provider);
+        selectedCard?.last4 ?? context.read<SelectedCardCubit>().state.last4;
     final selectedCardBankName = selectedCard?.bankName;
     if (selectedCardLast4 == null) {
       if (mounted) {
@@ -333,7 +352,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
     // Repository instance is lifecycle-independent Ã¢â‚¬â€ capture it now so the
     // save below never needs `ref` after the async gap.
-    final moneyRepo = ref.read(moneyRepositoryProvider);
+    final moneyRepo = context.read<FinanceCubit>();
     final amountController = TextEditingController();
     final noteController = TextEditingController();
     final currencyNotifier = ValueNotifier<String>('EGP');
@@ -450,7 +469,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
       // Touching providers after an async gap requires a live widget.
       if (!mounted) return;
-      ref.invalidate(selectedCardMoneySummaryProvider);
+      context.read<FinanceCubit>().reload();
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l['balanceAdded'])));
@@ -465,23 +484,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   /// MAIN/HOME PAGE item tap Ã¢â€ â€™ Item Purchase (requirement #21-#28).
   /// Confirms with the user, checks Pocket Cash, then executes the atomic
-  /// [MoneyRepository.purchaseItemWithCard]: the selected card's Pocket Cash Ã¢Ë†â€™,
+  /// [MoneyRepository.purchaseItemWithCash]: the selected card's Pocket Cash Ã¢Ë†â€™,
   /// expense transaction + (counts towards Deducted From), bank Balance
   /// unchanged. Transaction is linked to the selected card via card_last4.
   Future<void> _purchaseItem(Item item) async {
+    if (_purchasingItemId != null) return;
+    setState(() => _purchasingItemId = item.id);
+    try {
+      await _confirmAndPurchaseItem(item);
+    } finally {
+      if (mounted) setState(() => _purchasingItemId = null);
+    }
+  }
+
+  Future<void> _confirmAndPurchaseItem(Item item) async {
     final l = AppLocalizations.s(context);
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
 
     // Duplicate-tap protection: one purchase at a time (#27).
-    if (_purchasingItemId != null) {
-      logInfo('ITEM_PURCHASE_DUPLICATE_BLOCKED itemId=${item.id}');
-      return;
-    }
 
     // Requirement #10: verify a card is selected before doing anything.
     // Never silently charge another card.
-    final selectedCard = ref.read(selectedCardProvider).value;
+    final selectedCard =
+        context.read<FinanceCubit>().state.map((data) => data.card).value;
     if (selectedCard == null) {
       if (mounted) {
         await showDialog(
@@ -545,6 +571,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 8),
+              Text(l['pocketCashLabel']),
+              const SizedBox(height: 8),
               _CardPreview(card: selectedCard),
             ],
           ),
@@ -569,7 +597,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     // Requirement #17: re-validate the active card identity immediately before
     // completing the purchase, including the bank when last4 collides.
-    final activeCard = ref.read(selectedCardProvider).value;
+    final activeCard =
+        context.read<FinanceCubit>().state.map((data) => data.card).value;
     if (activeCard == null || activeCard.id != selectedCard.id) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -585,15 +614,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         'ITEM_PURCHASE_STARTED itemId=${item.id} cardLast4=$activeCardLast4 '
         'amountMinor=${item.priceMinor}');
     try {
-      final repo = ref.read(moneyRepositoryProvider);
-      await repo.purchaseItemWithCard(
+      final repo = context.read<FinanceCubit>();
+      await repo.purchaseItemWithCash(
         userId: userId,
         item: item,
         cardLast4: activeCardLast4,
         bankName: activeCard.bankName,
       );
-      ref.invalidate(selectedCardMoneySummaryProvider);
-      ref.invalidate(dashboardItemsProvider(userId));
       logInfo(
           'ITEM_PURCHASE_SUCCESS itemId=${item.id} cardLast4=$activeCardLast4');
       if (mounted) {
@@ -626,12 +653,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _purchasingItemId = null);
     }
   }
 
-  Widget _buildItemsSection(AsyncValue? itemsAsync, AppLocalizations l) {
+  Widget _buildItemsSection(LoadState? itemsAsync, AppLocalizations l) {
     final items = itemsAsync?.value ?? [];
     return Column(
       children: [
@@ -700,24 +725,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-class _HeaderButton extends StatelessWidget {
-  final IconData icon;
-  const _HeaderButton({required this.icon});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: context.fc.elevatedSurface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.fc.borderSubtle),
-      ),
-      child: Icon(icon, color: context.fc.textSecondary, size: 22),
-    );
-  }
-}
-
 class _SummaryCard extends StatelessWidget {
   final String title, amount, subtitle;
   final Color color;
@@ -729,46 +736,38 @@ class _SummaryCard extends StatelessWidget {
       required this.color,
       required this.icon});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.fc.primarySurface,
-        borderRadius: BorderRadius.circular(FloosyDesign.radiusLarge),
-        border: Border.all(color: context.fc.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 20)),
-          const SizedBox(height: 12),
-          Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, color: context.fc.textSecondary)),
-          const SizedBox(height: 4),
+  Widget build(BuildContext context) => FinancePanel(
+        height: 124,
+        padding: const EdgeInsets.all(16),
+        colors: [Color.lerp(color, Colors.black, .22)!, color],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(icon, color: Colors.white, size: 19),
+            const SizedBox(width: 7),
+            Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)))
+          ]),
+          const Spacer(),
           FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(amount,
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: context.fc.textPrimary))),
-          const SizedBox(height: 4),
+                  style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white))),
+          const SizedBox(height: 7),
           Text(subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: context.fc.textMuted)),
-        ],
-      ),
-    );
-  }
+              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+        ]),
+      );
 }
 
 class _BudgetItemCard extends StatelessWidget {
@@ -784,11 +783,12 @@ class _BudgetItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    // Real render/progress value for this item Ã¢â‚¬â€ computed from its price and
-    // budget spread, animated from zero once. Never removed/zeroed.
-    final price = item.priceMinor / 100;
-    final budget = price * 1.2;
-    final progress = (price / budget).clamp(0.0, 1.0);
+    final counts =
+        context.watch<ItemsCubit>().state.map((data) => data.usage).value ??
+            const <String, int>{};
+    final count = counts[item.id] ?? 0;
+    final total = counts.values.fold<int>(0, (sum, value) => sum + value);
+    final progress = total == 0 ? 0.0 : count / total;
     return GestureDetector(
       onTap: onTap,
       child: Opacity(
@@ -806,17 +806,7 @@ class _BudgetItemCard extends StatelessWidget {
               Row(
                 children: [
                   // Real item image (bounded, rounded, graceful fallback).
-                  FloosyItemImage(
-                    imageUrl: item.imageUrl,
-                    width: 42,
-                    height: 42,
-                    radius: 12,
-                    fallback: Container(
-                      color: context.fc.elevatedSurface,
-                      child: const Icon(Icons.shopping_bag_outlined,
-                          color: FloosyDesign.textSecondary, size: 20),
-                    ),
-                  ),
+                  ItemAvatar(item: item, size: 44),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(item.nameAr ?? item.name,
@@ -847,7 +837,7 @@ class _BudgetItemCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: value,
                       backgroundColor: context.fc.elevatedSurface,
-                      color: FloosyDesign.primaryPurple,
+                      color: ItemAppearance.decode(item.icon).color,
                       minHeight: 5,
                     ),
                   );
@@ -860,6 +850,10 @@ class _BudgetItemCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 12, color: context.fc.textMuted),
               ),
+              const SizedBox(height: 4),
+              Text(
+                  l.t('itemUsageShare', {'count': '$count', 'total': '$total'}),
+                  style: TextStyle(fontSize: 11, color: context.fc.textMuted)),
             ],
           ),
         ),

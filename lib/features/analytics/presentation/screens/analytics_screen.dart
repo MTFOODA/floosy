@@ -1,32 +1,24 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/providers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/analytics/presentation/cubit/analytics_cubit.dart';
+import 'package:floosy/core/state/load_state.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/money_formatter.dart';
-import '../../../../data/models/transaction_model.dart';
+import '../../../../domain/entities/transaction_model.dart';
 import '../../../transactions/presentation/widgets/transaction_widgets.dart';
 
 /// Real transactions for the Analysis screen (no mock data).
-final analysisTransactionsProvider =
-    FutureProvider.autoDispose<List<Transaction>>((ref) async {
-  final userId = ref.watch(currentUserIdProvider);
-  ref.watch(transactionsRefreshTickProvider);
-  if (userId == null) return const [];
-  return ref
-      .watch(transactionRepositoryProvider)
-      .getTransactions(userId: userId, limit: 500);
-});
 
-class AnalyticsScreen extends ConsumerStatefulWidget {
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _selectedPeriod = 1;
   static const _periodKeys = [
     'periodDaily',
@@ -97,7 +89,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final txAsync = ref.watch(analysisTransactionsProvider);
+    final txAsync = context.watch<AnalyticsCubit>().state;
     final now = DateTime.now();
     final months = [
       l['mo1'],
@@ -181,7 +173,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildSummaryCards(
-      AsyncValue<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
+      LoadState<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
     final all = txAsync.value ?? const <Transaction>[];
     final window = _windowTx(all, now);
     final prev = _previousWindowTx(all, now);
@@ -217,38 +209,47 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       }
     });
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 1.5,
-      children: [
-        _SummaryCard(
-            title: l['totalSpending'],
-            value: formatMoney(totalSpending),
-            subtitle: totalSubtitle,
-            subtitleColor:
-                totalSubtitle.startsWith('-') ? FloosyDesign.positive : null),
-        _SummaryCard(
-            title: l['largestExpense'],
-            value: largest != null ? formatMoney(largest.amountMinor) : '0 EGP',
-            subtitle: largestSubtitle),
-        _SummaryCard(
-            title: l['mostUsed'],
-            value: mostUsedType != null
-                ? transactionTypeLabel(l, mostUsedType!)
-                : '-',
-            subtitle: mostUsedType != null
-                ? '${typeCounts[mostUsedType]} ${l['timesLabel']}'
-                : l['noData']),
-        _SummaryCard(
-            title: l['transactionsCount'],
-            value: '${window.length}',
-            subtitle: l['thisMonth']),
-      ],
-    );
+    final cards = <Widget>[
+      _SummaryCard(
+          title: l['totalSpending'],
+          symbol: '💸',
+          value: formatMoney(totalSpending),
+          subtitle: totalSubtitle,
+          subtitleColor:
+              totalSubtitle.startsWith('-') ? FloosyDesign.positive : null),
+      _SummaryCard(
+          title: l['largestExpense'],
+          symbol: '🏠',
+          value: largest != null ? formatMoney(largest.amountMinor) : '0 EGP',
+          subtitle: largestSubtitle),
+      _SummaryCard(
+          title: l['mostUsed'],
+          symbol: '🛍️',
+          value: mostUsedType != null
+              ? transactionTypeLabel(l, mostUsedType!)
+              : '-',
+          subtitle: mostUsedType != null
+              ? '${typeCounts[mostUsedType]} ${l['timesLabel']}'
+              : l['noData']),
+      _SummaryCard(
+          title: l['transactionsCount'],
+          symbol: '📊',
+          value: '${window.length}',
+          subtitle: l['thisMonth']),
+    ];
+    // Let each card grow with its content instead of imposing a grid aspect
+    // ratio, which clips Arabic text on narrower phones.
+    return LayoutBuilder(builder: (context, constraints) {
+      final columns = constraints.maxWidth < 300 ? 1 : 2;
+      final width = (constraints.maxWidth - (columns - 1) * 14) / columns;
+      return Wrap(
+        spacing: 14,
+        runSpacing: 14,
+        children: [
+          for (final card in cards) SizedBox(width: width, child: card),
+        ],
+      );
+    });
   }
 
   List<double> _weeklyBars(List<Transaction> all, DateTime now) {
@@ -268,7 +269,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildSpendingTrend(
-      AsyncValue<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
+      LoadState<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
     final barData = _weeklyBars(txAsync.value ?? const [], now);
     final days = [
       l['wd1'],
@@ -346,7 +347,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildCategoryDonut(
-      AsyncValue<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
+      LoadState<List<Transaction>> txAsync, AppLocalizations l, DateTime now) {
     final all = txAsync.value ?? const <Transaction>[];
     final spendings = _windowTx(all, now).where(_isSpending).toList();
 
@@ -396,8 +397,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           Text(l['spendingByCategory'], style: context.fc.cardTitle),
           const SizedBox(height: 20),
           if (categories.isEmpty)
-            SizedBox(
-              height: 150,
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 150),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -414,65 +415,75 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               ),
             )
           else
-            Row(
-              children: [
-                SizedBox(
-                  width: 150,
-                  height: 150,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1.0),
-                    duration: FloosyDesign.chartAnim,
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, _) {
-                      return PieChart(PieChartData(
-                          sectionsSpace: 3,
-                          centerSpaceRadius: 45,
-                          sections: categories
-                              .map((cat) => PieChartSectionData(
-                                  value: cat.percentage * value,
-                                  color: cat.color,
-                                  radius: 28,
-                                  showTitle: false))
-                              .toList()));
-                    },
+            LayoutBuilder(builder: (context, constraints) {
+              final stack = constraints.maxWidth < 360 ||
+                  MediaQuery.textScalerOf(context).scale(13) > 18;
+              return Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    height: 150,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: 1.0),
+                      duration: FloosyDesign.chartAnim,
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) {
+                        return PieChart(PieChartData(
+                            sectionsSpace: 3,
+                            centerSpaceRadius: 45,
+                            sections: categories
+                                .map((cat) => PieChartSectionData(
+                                    value: cat.percentage * value,
+                                    color: cat.color,
+                                    radius: 28,
+                                    showTitle: false))
+                                .toList()));
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    children: categories
-                        .map((cat) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                children: [
-                                  Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                          color: cat.color,
-                                          shape: BoxShape.circle)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                      child: Text(cat.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              color:
-                                                  context.fc.textSecondary))),
-                                  Text('${(cat.percentage * 100).round()}%',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          color: context.fc.textPrimary,
-                                          fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ))
-                        .toList(),
+                  SizedBox(
+                    width: stack
+                        ? constraints.maxWidth
+                        : constraints.maxWidth - 166,
+                    child: Column(
+                      children: categories
+                          .map((cat) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                            color: cat.color,
+                                            shape: BoxShape.circle)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                        child: Text(cat.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color:
+                                                    context.fc.textSecondary))),
+                                    Text('${(cat.percentage * 100).round()}%',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: context.fc.textPrimary,
+                                            fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              );
+            }),
         ],
       ),
     );
@@ -481,9 +492,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
 class _SummaryCard extends StatelessWidget {
   final String title, value, subtitle;
+  final String symbol;
   final Color? subtitleColor;
   const _SummaryCard(
       {required this.title,
+      required this.symbol,
       required this.value,
       required this.subtitle,
       this.subtitleColor});
@@ -491,19 +504,27 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(minHeight: 120),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: context.fc.primarySurface,
           borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
           border: Border.all(color: context.fc.borderSubtle)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: context.fc.textMuted)),
+          Row(children: [
+            Text(symbol, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 7),
+            Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        TextStyle(fontSize: 11, color: context.fc.textMuted)))
+          ]),
           const SizedBox(height: 6),
           FittedBox(
               fit: BoxFit.scaleDown,

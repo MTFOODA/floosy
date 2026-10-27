@@ -1,13 +1,15 @@
-import '../models/ai_model.dart';
+import '../../domain/repositories/ai_repository.dart' as domain;
+import '../../domain/entities/ai_model.dart';
 import '../remote/datasources/ai_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class AIRepository {
+class AIRepository implements domain.AIRepository {
   final AIRemoteDataSource remoteDataSource;
 
   AIRepository({required this.remoteDataSource});
 
   /// Get all conversations for a user
+  @override
   Future<List<AIConversation>> getConversations(String userId) async {
     try {
       return await remoteDataSource.getConversations(userId);
@@ -18,6 +20,7 @@ class AIRepository {
   }
 
   /// Get conversation by ID
+  @override
   Future<AIConversation?> getConversation(String conversationId) async {
     try {
       return await remoteDataSource.getConversation(conversationId);
@@ -28,6 +31,7 @@ class AIRepository {
   }
 
   /// Create a new conversation
+  @override
   Future<AIConversation> createConversation({
     required String userId,
     required String title,
@@ -47,6 +51,7 @@ class AIRepository {
   }
 
   /// Delete a conversation
+  @override
   Future<void> deleteConversation(String conversationId) async {
     try {
       await remoteDataSource.deleteConversation(conversationId);
@@ -57,6 +62,7 @@ class AIRepository {
   }
 
   /// Get messages in a conversation
+  @override
   Future<List<AIMessage>> getMessages(String conversationId) async {
     try {
       return await remoteDataSource.getMessages(conversationId);
@@ -67,6 +73,7 @@ class AIRepository {
   }
 
   /// Add a user message to conversation
+  @override
   Future<AIMessage> addUserMessage({
     required String conversationId,
     required String userId,
@@ -92,6 +99,7 @@ class AIRepository {
   }
 
   /// Add an assistant message to conversation
+  @override
   Future<AIMessage> addAssistantMessage({
     required String conversationId,
     required String userId,
@@ -117,6 +125,7 @@ class AIRepository {
   }
 
   /// Add a tool call message
+  @override
   Future<AIMessage> addToolMessage({
     required String conversationId,
     required String userId,
@@ -144,6 +153,7 @@ class AIRepository {
   }
 
   /// Get pending AI actions for a user
+  @override
   Future<List<AIAction>> getPendingActions(String userId) async {
     try {
       return await remoteDataSource.getPendingActions(userId);
@@ -154,6 +164,7 @@ class AIRepository {
   }
 
   /// Get AI action by ID
+  @override
   Future<AIAction?> getAction(String actionId) async {
     try {
       return await remoteDataSource.getAction(actionId);
@@ -164,6 +175,7 @@ class AIRepository {
   }
 
   /// Create a new AI action (pending confirmation)
+  @override
   Future<AIAction> createAction({
     required String userId,
     required String toolName,
@@ -189,6 +201,7 @@ class AIRepository {
   }
 
   /// Confirm an AI action
+  @override
   Future<AIAction> confirmAction(String actionId) async {
     try {
       return await remoteDataSource.updateActionStatus(
@@ -202,6 +215,7 @@ class AIRepository {
   }
 
   /// Reject an AI action
+  @override
   Future<AIAction> rejectAction(String actionId) async {
     try {
       return await remoteDataSource.updateActionStatus(
@@ -215,6 +229,7 @@ class AIRepository {
   }
 
   /// Complete an AI action with result
+  @override
   Future<AIAction> completeAction({
     required String actionId,
     required Map<String, dynamic> result,
@@ -228,6 +243,7 @@ class AIRepository {
   }
 
   /// Fail an AI action
+  @override
   Future<AIAction> failAction({
     required String actionId,
     required String errorMessage,
@@ -241,6 +257,7 @@ class AIRepository {
   }
 
   /// Get financial summary for AI context
+  @override
   Future<Map<String, dynamic>> getFinancialSummary(String userId) async {
     try {
       return await remoteDataSource.getFinancialSummary(userId);
@@ -251,6 +268,7 @@ class AIRepository {
   }
 
   /// Get spending insights
+  @override
   Future<String> getSpendingInsights(String userId) async {
     try {
       return await remoteDataSource.getSpendingInsights(userId);
@@ -261,6 +279,7 @@ class AIRepository {
   }
 
   /// Get recommendations
+  @override
   Future<List<String>> getRecommendations(String userId) async {
     try {
       return await remoteDataSource.getRecommendations(userId);

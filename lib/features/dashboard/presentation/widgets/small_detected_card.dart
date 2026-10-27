@@ -1,6 +1,7 @@
+import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_design_system.dart';
-import '../../../../data/models/detected_card_model.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 
 /// A small, compact bank card widget for the Dashboard.
 ///
@@ -28,7 +29,9 @@ class SmallDetectedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = card.appearance.colors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final avgLum = colors.map((c) => c.computeLuminance()).reduce((a, b) => a + b) / colors.length;
+    final avgLum =
+        colors.map((c) => c.computeLuminance()).reduce((a, b) => a + b) /
+            colors.length;
     final fg = avgLum > 0.45 ? const Color(0xFF1A1A2E) : Colors.white;
 
     return GestureDetector(
@@ -86,7 +89,8 @@ class SmallDetectedCard extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(left: 13, right: 13, top: 12, bottom: 11),
+                padding: const EdgeInsets.only(
+                    left: 13, right: 13, top: 12, bottom: 11),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,

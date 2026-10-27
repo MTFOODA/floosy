@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/bank_mappings_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/profile_cubit.dart';
+import 'package:floosy/core/localization/preferences_cubit.dart';
+import 'package:floosy/core/services/app_lock_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../../../core/theme/app_design_system.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../routing/app_routes.dart';
 import '../widgets/logout_dialog.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final themeMode = ref.watch(themeModeNotifierProvider);
-    final profileAsync = ref.watch(userProfileProvider);
-    final authUser = ref.watch(currentUserProvider);
+    final themeMode = context.watch<ThemeModeCubit>().state;
+    final profileAsync = context.watch<ProfileCubit>().state;
+    final authUser = context.watch<AuthCubit>().state.user;
     final authEmail = authUser?.email ?? '';
     final userName = profileAsync.value?.fullName ?? '';
     final email = authEmail.isNotEmpty ? authEmail : 'ahmed@example.com';
@@ -35,13 +39,13 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 28),
               _buildSectionLabel(context, l['sectionCustomize']),
               const SizedBox(height: 10),
-              _buildCustomizeCard(context, themeMode, ref, l),
+              _buildCustomizeCard(context, themeMode, l),
               const SizedBox(height: 28),
               _buildSectionLabel(context, l['sectionAccount']),
               const SizedBox(height: 10),
-              _buildAccountCard(context, ref, l),
+              _buildAccountCard(context, l),
               const SizedBox(height: 28),
-              _buildLogoutButton(context, ref, l),
+              _buildLogoutButton(context, l),
               const SizedBox(height: 24),
               Center(
                 child: Text('Floosy | v1.0.0',
@@ -116,8 +120,8 @@ class SettingsScreen extends ConsumerWidget {
             letterSpacing: 1));
   }
 
-  Widget _buildCustomizeCard(BuildContext context, ThemeMode themeMode,
-      WidgetRef ref, AppLocalizations l) {
+  Widget _buildCustomizeCard(
+      BuildContext context, ThemeMode themeMode, AppLocalizations l) {
     final isDark = themeMode == ThemeMode.dark;
     return Container(
       decoration: BoxDecoration(
@@ -126,6 +130,26 @@ class SettingsScreen extends ConsumerWidget {
           border: Border.all(color: context.fc.borderSubtle)),
       child: Column(
         children: [
+          if (context.watch<AuthCubit>().state.userId case final String userId)
+            SwitchListTile(
+              secondary: const Icon(Icons.fingerprint),
+              title: Text(l['biometricLock']),
+              value: context.watch<AppLockCubit>().state.enabled.value ?? false,
+              onChanged: (enabled) async {
+                final ok = await context
+                    .read<AppLockCubit>()
+                    .setEnabled(userId, enabled, l['biometricReason']);
+                if (!context.mounted) return;
+                if (ok) {
+                  context.read<AppLockCubit>().markVerified(userId);
+                }
+                context.read<AppLockCubit>().reloadEnabled();
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l['biometricUnavailable'])));
+                }
+              },
+            ),
           _SettingsRow(
               icon: Icons.receipt_long_outlined,
               label: l['manageItems'],
@@ -136,8 +160,8 @@ class SettingsScreen extends ConsumerWidget {
               label: l['theme'],
               trailing: Switch(
                   value: isDark,
-                  onChanged: (dark) => ref
-                      .read(themeModeNotifierProvider.notifier)
+                  onChanged: (dark) => context
+                      .read<ThemeModeCubit>()
                       .setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
                   activeThumbColor: FloosyDesign.primaryPurple)),
           Divider(height: 1, color: context.fc.borderSubtle),
@@ -153,14 +177,13 @@ class SettingsScreen extends ConsumerWidget {
                   child: Text('English',
                       style: TextStyle(
                           fontSize: 13, color: context.fc.textSecondary))),
-              onTap: () => showLanguageDialog(context, ref, l)),
+              onTap: () => showLanguageDialog(context, l)),
         ],
       ),
     );
   }
 
-  Widget _buildAccountCard(
-      BuildContext context, WidgetRef ref, AppLocalizations l) {
+  Widget _buildAccountCard(BuildContext context, AppLocalizations l) {
     return Container(
       decoration: BoxDecoration(
           color: context.fc.primarySurface,
@@ -171,7 +194,7 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsRow(
               icon: Icons.account_balance_outlined,
               label: l['bankMappings'],
-              onTap: () => _showBankMappingsSheet(context, ref, l)),
+              onTap: () => _showBankMappingsSheet(context, l)),
           Divider(height: 1, color: context.fc.borderSubtle),
           _SettingsRow(
               icon: Icons.lock_outline_rounded,
@@ -205,10 +228,10 @@ class SettingsScreen extends ConsumerWidget {
   /// mapping persists per-user and future SMS from that sender are
   /// attributed automatically — classification is never affected.
   Future<void> _showBankMappingsSheet(
-      BuildContext context, WidgetRef ref, AppLocalizations l) async {
-    final userId = ref.read(currentUserIdProvider);
+      BuildContext context, AppLocalizations l) async {
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    final store = ref.read(bankSenderMappingStoreProvider);
+    final store = context.read<BankMappingsCubit>();
     final unknown = await store.getUnknownSenders(userId);
 
     if (!context.mounted) return;
@@ -322,10 +345,9 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoutButton(
-      BuildContext context, WidgetRef ref, AppLocalizations l) {
+  Widget _buildLogoutButton(BuildContext context, AppLocalizations l) {
     return GestureDetector(
-      onTap: () => confirmLogout(context, ref, l),
+      onTap: () => confirmLogout(context, l),
       child: Container(
         height: 66,
         width: double.infinity,

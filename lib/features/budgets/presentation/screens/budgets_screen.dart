@@ -1,8 +1,8 @@
+import 'package:floosy/domain/entities/budget_with_spending.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/providers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/budgets/presentation/cubit/budgets_cubit.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../data/models/budget_model.dart';
 import '../../../../theme/app_theme.dart';
 
 /// Formats minor units into a display string.
@@ -12,50 +12,14 @@ String formatMoney(int minor, String currency) {
 }
 
 /// Async list of the user's budgets with computed spending.
-final budgetsProvider =
-    FutureProvider.autoDispose<List<BudgetWithSpending>>((ref) async {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return const [];
-  final repo = ref.watch(budgetRepositoryProvider);
-  final budgets = await repo.getActiveBudgets(userId);
-  final result = <BudgetWithSpending>[];
-  for (final budget in budgets) {
-    final spending = await repo.getCurrentSpending(budget.id);
-    final totalSpent = spending.values.fold<int>(0, (a, b) => a + b);
-    result.add(BudgetWithSpending(
-      budget: budget,
-      spendingByCategory: spending,
-      totalSpentMinor: totalSpent,
-    ));
-  }
-  return result;
-});
 
-class BudgetWithSpending {
-  final Budget budget;
-  final Map<String, int> spendingByCategory;
-  final int totalSpentMinor;
-
-  const BudgetWithSpending({
-    required this.budget,
-    required this.spendingByCategory,
-    required this.totalSpentMinor,
-  });
-
-  double get usedPercentage => budget.amountMinor == 0
-      ? 0
-      : (totalSpentMinor / budget.amountMinor * 100).clamp(0, 999);
-
-  int get remainingMinor => budget.amountMinor - totalSpentMinor;
-}
-
-class BudgetsScreen extends ConsumerWidget {
+class BudgetsScreen extends StatelessWidget {
   const BudgetsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final budgetsAsync = ref.watch(budgetsProvider);
+    final budgetsAsync = context.watch<BudgetsCubit>().state;
 
     return Scaffold(
       appBar: AppBar(title: Text(l['budgets'])),
@@ -73,7 +37,7 @@ class BudgetsScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: () => ref.invalidate(budgetsProvider),
+                onPressed: () => context.read<BudgetsCubit>().reload(),
                 child: Text(l['retry']),
               ),
             ],
@@ -82,7 +46,7 @@ class BudgetsScreen extends ConsumerWidget {
         data: (budgets) => budgets.isEmpty
             ? const _EmptyBudgetsView()
             : RefreshIndicator(
-                onRefresh: () async => ref.invalidate(budgetsProvider),
+                onRefresh: () async => context.read<BudgetsCubit>().reload(),
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: budgets.length,

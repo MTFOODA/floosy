@@ -2,14 +2,17 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'app/presentation_dependencies.dart';
+import 'app/app_runtime.dart';
+import 'app/composition_root.dart';
+import 'app/app_scope.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'routing/app_router.dart';
 import 'theme/app_theme.dart';
 import 'config/supabase_config.dart';
-import 'core/providers.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/services/sms_permission_service.dart';
+import 'core/widgets/auth/biometric_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,31 +23,40 @@ void main() async {
     publishableKey: SupabaseConfig.publishableKey,
   );
 
-  runApp(
-    const ProviderScope(
-      child: FloosyApp(),
-    ),
-  );
+  final dependencies = AppDependencies();
+  final runtime = AppRuntime(dependencies.repositories());
+  dependencies.currentUserId = () => runtime.auth.state.userId;
+  dependencies.onDataChanged = runtime.refresh.refresh;
+  runApp(AppScope(
+      runtime: runtime,
+      ownsRuntime: true,
+      disposeDependencies: dependencies.close,
+      child: const FloosyApp()));
 }
 
-class FloosyApp extends ConsumerStatefulWidget {
+class FloosyApp extends StatefulWidget {
   const FloosyApp({super.key});
 
   @override
-  ConsumerState<FloosyApp> createState() => _FloosyAppState();
+  State<FloosyApp> createState() => _FloosyAppState();
 }
 
-class _FloosyAppState extends ConsumerState<FloosyApp> {
+class _FloosyAppState extends State<FloosyApp> {
   /// ONE 5-second bank-SMS polling loop for the whole app (requirement #2).
   /// Started exactly once with the root widget — never per screen, never in
   /// build. The poller itself is lifecycle-safe (pauses in background) and
   /// no-ops when no user is signed in.
   bool _smsPermissionRequested = false;
+  late final AppRouterController _router;
+  late final SmsCubit _sms;
 
   @override
   void initState() {
     super.initState();
-    ref.read(smsPollingServiceProvider).start();
+    _router = AppRouterController(
+        context.read<AuthCubit>(), context.read<AppLockCubit>());
+    _sms = context.read<SmsCubit>();
+    _sms.start();
     // Requirement #17: the manual "فحص رسائل البنك" button was removed, so
     // READ_SMS must be requested automatically once per app session —
     // otherwise the polling pipeline runs with no permission and silently
@@ -63,15 +75,16 @@ class _FloosyAppState extends ConsumerState<FloosyApp> {
 
   @override
   void dispose() {
-    ref.read(smsPollingServiceProvider).stop();
+    _sms.stop();
+    _router.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final appRouter = ref.watch(appRouterProvider);
-    final locale = ref.watch(localeNotifierProvider);
-    final themeMode = ref.watch(themeModeNotifierProvider);
+    final appRouter = _router.router;
+    final locale = context.watch<LocaleCubit>().state;
+    final themeMode = context.watch<ThemeModeCubit>().state;
 
     return MaterialApp.router(
       title: 'Floosy',
@@ -80,6 +93,8 @@ class _FloosyAppState extends ConsumerState<FloosyApp> {
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
+      builder: (context, child) =>
+          BiometricGate(child: child ?? const SizedBox.shrink()),
       locale: locale,
       supportedLocales: supportedLocales,
       localizationsDelegates: const [

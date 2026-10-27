@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/money_model.dart';
+import '../../../domain/entities/money_model.dart';
 
 /// Remote (Supabase) data source for monthly income, user bank accounts and
 /// their ledger movements.

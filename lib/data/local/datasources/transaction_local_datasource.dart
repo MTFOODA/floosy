@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 import '../database/app_database.dart' as db;
-import '../../models/transaction_model.dart';
+import '../../../domain/entities/transaction_model.dart';
 
 class TransactionLocalDataSource {
   final db.AppDatabase _db;
@@ -85,7 +85,8 @@ class TransactionLocalDataSource {
   }
 
   /// Updates only the card_id field for a transaction.
-  Future<void> updateTransactionCardId(String transactionId, String cardId) async {
+  Future<void> updateTransactionCardId(
+      String transactionId, String cardId) async {
     await (_db.update(_db.transactions)
           ..where((t) => t.id.equals(transactionId)))
         .write(db.TransactionsCompanion(cardId: Value(cardId)));
@@ -109,10 +110,10 @@ class TransactionLocalDataSource {
     await (_db.update(_db.transactions)
           ..where((t) => t.id.equals(transactionId)))
         .write(db.TransactionsCompanion(
-          cardId: Value(cardId),
-          cardLast4: Value(cardLast4),
-          updatedAt: Value(DateTime.now()),
-        ));
+      cardId: Value(cardId),
+      cardLast4: Value(cardLast4),
+      updatedAt: Value(DateTime.now()),
+    ));
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -125,8 +126,7 @@ class TransactionLocalDataSource {
     String cardId,
   ) async {
     final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) & t.cardId.equals(cardId))
+          ..where((t) => t.userId.equals(userId) & t.cardId.equals(cardId))
           ..orderBy([
             (t) => OrderingTerm(
                 expression: t.transactionDate, mode: OrderingMode.desc)
@@ -218,12 +218,12 @@ class TransactionLocalDataSource {
   }) async {
     Expression<bool> expr = _db.transactions.userId.equals(userId);
     if (startDateTime != null) {
-      expr = expr & _db.transactions.transactionDate
-          .isBiggerOrEqualValue(startDateTime);
+      expr = expr &
+          _db.transactions.transactionDate.isBiggerOrEqualValue(startDateTime);
     }
     if (endDateTime != null) {
-      expr = expr & _db.transactions.transactionDate
-          .isSmallerOrEqualValue(endDateTime);
+      expr = expr &
+          _db.transactions.transactionDate.isSmallerOrEqualValue(endDateTime);
     }
     final rows = await (_db.select(_db.transactions)
           ..where((t) => expr)

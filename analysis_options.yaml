@@ -15,6 +15,7 @@ analyzer:
     # snake_case Supabase mapping); this is the documented Freezed pattern.
     invalid_annotation_target: ignore
   exclude:
+    - .diag/**
     - build/**
     - android/**
     - ios/**

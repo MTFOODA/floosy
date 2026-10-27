@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
-import '../../models/money_model.dart';
-import '../../models/item_model.dart';
-import '../../models/transaction_model.dart' as models;
+import '../../../domain/entities/money_model.dart';
+import '../../../domain/entities/item_model.dart';
+import '../../../domain/entities/transaction_model.dart' as models;
 import '../database/app_database.dart' as db;
 
 /// Local (Drift) storage for the money model: monthly income, bank accounts,
@@ -46,8 +46,7 @@ class MoneyLocalDataSource {
       // that gained an explicit assignment between planning and writing is
       // left alone instead of being clobbered.
       updated = await (_db.update(_db.transactions)
-            ..where((t) =>
-                t.id.isIn(transactionIds) & t.cardId.isNull()))
+            ..where((t) => t.id.isIn(transactionIds) & t.cardId.isNull()))
           .write(db.TransactionsCompanion(cardId: Value(cardId)));
     });
     return updated;
@@ -94,10 +93,10 @@ class MoneyLocalDataSource {
       written += await (_db.update(_db.transactions)
             ..where((t) => t.id.equals(transactionId)))
           .write(db.TransactionsCompanion(
-            cardLast4: Value(last4),
-            cardId: Value(cardId),
-            updatedAt: Value(DateTime.now()),
-          ));
+        cardLast4: Value(last4),
+        cardId: Value(cardId),
+        updatedAt: Value(DateTime.now()),
+      ));
 
       // 2. The other rows proven to carry the same identity. `card_id IS NULL`
       //    is re-checked INSIDE the transaction so a row that gained an
@@ -109,10 +108,10 @@ class MoneyLocalDataSource {
         written += await (_db.update(_db.transactions)
               ..where((t) => t.id.isIn(others) & t.cardId.isNull()))
             .write(db.TransactionsCompanion(
-              cardLast4: Value(last4),
-              cardId: Value(cardId),
-              updatedAt: Value(DateTime.now()),
-            ));
+          cardLast4: Value(last4),
+          cardId: Value(cardId),
+          updatedAt: Value(DateTime.now()),
+        ));
       }
     });
     return written;
@@ -285,10 +284,10 @@ class MoneyLocalDataSource {
       editedRows = await (_db.update(_db.transactions)
             ..where((t) => t.id.equals(transactionId)))
           .write(db.TransactionsCompanion(
-            cardLast4: Value(last4),
-            cardId: Value(cardId),
-            updatedAt: Value(DateTime.now()),
-          ));
+        cardLast4: Value(last4),
+        cardId: Value(cardId),
+        updatedAt: Value(DateTime.now()),
+      ));
 
       if (siblings.isNotEmpty) {
         // 2. Every same-user/same-bank sibling that was missing the Last 4.
@@ -297,17 +296,17 @@ class MoneyLocalDataSource {
         siblingLast4Rows = await (_db.update(_db.transactions)
               ..where((t) => t.id.isIn(siblings) & t.cardLast4.isNull()))
             .write(db.TransactionsCompanion(
-              cardLast4: Value(last4),
-              updatedAt: Value(DateTime.now()),
-            ));
+          cardLast4: Value(last4),
+          updatedAt: Value(DateTime.now()),
+        ));
 
         // 3. Card ownership, only where it is still unassigned.
         siblingCardRows = await (_db.update(_db.transactions)
               ..where((t) => t.id.isIn(siblings) & t.cardId.isNull()))
             .write(db.TransactionsCompanion(
-              cardId: Value(cardId),
-              updatedAt: Value(DateTime.now()),
-            ));
+          cardId: Value(cardId),
+          updatedAt: Value(DateTime.now()),
+        ));
       }
 
       if (fillSmsDetections) {
@@ -316,11 +315,12 @@ class MoneyLocalDataSource {
         //    joined on the persisted relationship, never on content matching.
         smsRows = await (_db.update(_db.smsMessages)
               ..where((s) =>
-                  s.transactionId.isIn(affected) & s.detectedCardLast4.isNull()))
+                  s.transactionId.isIn(affected) &
+                  s.detectedCardLast4.isNull()))
             .write(db.SmsMessagesCompanion(
-              detectedCardLast4: Value(last4),
-              cardLast4Identified: const Value(true),
-            ));
+          detectedCardLast4: Value(last4),
+          cardLast4Identified: const Value(true),
+        ));
       }
     });
 
@@ -583,6 +583,72 @@ class MoneyLocalDataSource {
           usageDate: Value(usage.usageDate),
           createdAt: Value(usage.createdAt ?? DateTime.now()),
         ));
+  }
+
+  Future<void> queueItemCashSync(String userId, String transactionId) async {
+    await _db.into(_db.syncQueue).insert(
+        db.SyncQueueCompanion.insert(
+            id: 'item-cash-$transactionId',
+            userId: userId,
+            entityType: 'item_cash_movement',
+            entityId: transactionId,
+            operation: 'insert'),
+        mode: InsertMode.insertOrIgnore);
+  }
+
+  Future<List<String>> pendingItemCashSync(String userId) async {
+    final rows = await (_db.select(_db.syncQueue)
+          ..where((t) =>
+              t.userId.equals(userId) &
+              t.entityType.equals('item_cash_movement') &
+              t.status.equals('pending'))
+          ..limit(50))
+        .get();
+    return rows.map((r) => r.entityId).toList();
+  }
+
+  Future<void> markItemCashSynced(String userId, String transactionId) async {
+    await (_db.update(_db.syncQueue)
+          ..where((t) =>
+              t.userId.equals(userId) &
+              t.id.equals('item-cash-$transactionId')))
+        .write(db.SyncQueueCompanion(
+            status: const Value('synced'), updatedAt: Value(DateTime.now())));
+  }
+
+  /// Count confirmed purchases only; orphaned/cancelled usage is excluded.
+  Future<Map<String, int>> getConfirmedItemUsageCounts(
+      String userId, int year, int month) async {
+    final usages = _db.itemUsages;
+    final expenses = _db.expenses;
+    final transactions = _db.transactions;
+    final quantity = usages.quantity.sum();
+    final query = _db.selectOnly(usages)
+      ..addColumns([usages.itemId, quantity])
+      ..join([
+        innerJoin(expenses, expenses.id.equalsExp(usages.expenseId)),
+        innerJoin(
+            transactions, transactions.id.equalsExp(expenses.transactionId)),
+      ])
+      ..where(usages.userId.equals(userId) &
+          expenses.userId.equals(userId) &
+          transactions.userId.equals(userId) &
+          usages.quantity.isBiggerThanValue(0) &
+          transactions.status
+              .equals(models.TransactionStatus.confirmed.toString()) &
+          transactions.type.isIn([
+            models.TransactionType.cash_expense.toString(),
+            models.TransactionType.purchase.toString(),
+          ]) &
+          transactions.transactionDate
+              .isBiggerOrEqualValue(DateTime(year, month)) &
+          transactions.transactionDate
+              .isSmallerThanValue(DateTime(year, month + 1)))
+      ..groupBy([usages.itemId]);
+    return {
+      for (final row in await query.get())
+        row.read(usages.itemId)!: row.read(quantity) ?? 0
+    };
   }
 
   Future<List<models.ItemUsage>> getItemUsages(

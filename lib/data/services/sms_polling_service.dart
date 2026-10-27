@@ -1,9 +1,10 @@
+import '../../domain/repositories/sms_repository.dart';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
 import '../local/datasources/processed_sms_local_datasource.dart';
-import '../models/user_model.dart';
+import '../../domain/entities/user_model.dart';
 import '../../core/utils/app_logger.dart';
 import 'sms_ingestion_service.dart';
 import 'sms_sync_state_store.dart';
@@ -32,7 +33,8 @@ import 'sms_sync_state_store.dart';
 /// NO display-range coupling: which SMS are ingested is decided ONLY by the
 /// processed-SMS ledger + this persisted cursor. The Transactions page display
 /// filter never calls into this service.
-class SmsPollingService extends WidgetsBindingObserver {
+class SmsPollingService extends WidgetsBindingObserver
+    implements SmsRepository {
   /// Automatic check interval for newly arrived bank/wallet SMS.
   static const Duration interval = Duration(seconds: 5);
 
@@ -128,6 +130,7 @@ class SmsPollingService extends WidgetsBindingObserver {
   /// so OPENING THE APP checks for new bank/wallet SMS right away (and performs
   /// the one-time historical scan on first run) instead of waiting a whole
   /// interval.
+  @override
   void start() {
     if (_started) return;
     _started = true;
@@ -138,6 +141,7 @@ class SmsPollingService extends WidgetsBindingObserver {
   }
 
   /// Stops polling and releases the observer (no leaks).
+  @override
   void stop() {
     _timer?.cancel();
     _timer = null;
@@ -205,6 +209,7 @@ class SmsPollingService extends WidgetsBindingObserver {
   /// the failure of an unrelated automatic cycle. The attempt is BOUNDED: the
   /// retry's own result is returned as-is (never re-joined, never retried
   /// again), so a permanently failing pipeline can never spin.
+  @override
   Future<SmsIngestionResult> scanNow({bool fullScan = false}) async {
     final joinedClaim = _inflight;
     if (joinedClaim != null) {

@@ -1,44 +1,13 @@
-﻿import 'dart:async';
+import '../../domain/entities/card_resolution_result.dart';
+export '../../domain/entities/card_resolution_result.dart';
+import 'dart:async';
 
 import '../local/datasources/money_local_datasource.dart'
     show BankScopedIdentityWriteResult;
-import '../models/detected_card_model.dart';
-import '../models/transaction_model.dart';
+import '../../domain/entities/detected_card_model.dart';
+import '../../domain/entities/transaction_model.dart';
 import '../../core/utils/app_logger.dart';
-import 'card_ownership.dart';
-
-/// Outcome of a smart-resolution attempt.
-class SmartResolutionResult {
-  /// The central resolver's verdict, used verbatim by the red-dot UI so the
-  /// indicator can never disagree with what the resolver actually proved.
-  final CardOwnershipResolution resolution;
-
-  /// True when the explicitly edited transaction itself was assigned.
-  final bool transactionAssigned;
-
-  /// Ids of additional unresolved transactions that were safely propagated.
-  final List<String> propagatedTransactionIds;
-
-  /// True when this call wrote a card assignment (created identity or assigned
-  /// rows). False when nothing needed to change — which is what makes repeated
-  /// confirmations idempotent.
-  final bool identityWasCreated;
-
-  const SmartResolutionResult({
-    required this.resolution,
-    this.transactionAssigned = false,
-    this.propagatedTransactionIds = const [],
-    this.identityWasCreated = false,
-  });
-
-  bool get isResolved => resolution.isResolved;
-  bool get isAmbiguous => resolution is Ambiguous;
-  bool get isUnresolved => resolution is Unresolved;
-
-  /// Total rows written, including the edited transaction.
-  int get totalAssigned =>
-      (transactionAssigned ? 1 : 0) + propagatedTransactionIds.length;
-}
+import '../../domain/services/card_ownership.dart';
 
 /// The two sibling populations a bank-scoped confirmation acts on.
 ///
@@ -89,6 +58,9 @@ class _BankScopedSiblings {
 ///   * if the identity cannot be proven, the ONLY row written is the one the
 ///     user explicitly edited.
 class SmartCardResolutionService {
+  final Future<List<String>> Function(
+          String userId, String transactionId, List<String> candidates)?
+      filterSmsSiblings;
   final Future<List<DetectedCard>> Function(String userId) _cards;
   final Future<List<Transaction>> Function(String userId) _transactions;
   final Future<Map<String, String>> Function(String userId) _bankNames;
@@ -144,6 +116,7 @@ class SmartCardResolutionService {
   ) _learnCardIdentity;
 
   SmartCardResolutionService({
+    this.filterSmsSiblings,
     required Future<List<DetectedCard>> Function(String userId) cards,
     required Future<List<Transaction>> Function(String userId) transactions,
     required Future<Map<String, String>> Function(String userId) bankNames,
@@ -184,7 +157,6 @@ class SmartCardResolutionService {
         _applyBankScopedIdentity = applyBankScopedIdentity,
         _learnCardIdentity = learnCardIdentity,
         _assignRemote = assignRemote ?? ((_, __) async {});
-
 
   /// Mirrors the committed identity to Supabase WITHOUT blocking the caller.
   ///
@@ -325,10 +297,13 @@ class SmartCardResolutionService {
     if (normalized == null) {
       final result = SmartResolutionResult(
         resolution: Unresolved(
-          (last4 == null || last4.trim().isEmpty) ? 'no_last4' : 'invalid_last4',
+          (last4 == null || last4.trim().isEmpty)
+              ? 'no_last4'
+              : 'invalid_last4',
         ),
       );
-      logInfo('CARD_LEARN_REJECTED txn=$transactionId ${result.resolution.reason}');
+      logInfo(
+          'CARD_LEARN_REJECTED txn=$transactionId ${result.resolution.reason}');
       return result;
     }
 
@@ -381,13 +356,20 @@ class SmartCardResolutionService {
     }
     final type = edited.type.toString();
 
-    final siblings = await _bankScopedNullLast4Candidates(
+    var siblings = await _bankScopedNullLast4Candidates(
       userId: userId,
       bank: bank,
       last4: normalized,
       excludeId: transactionId,
       type: type,
     );
+    if (filterSmsSiblings != null) {
+      final allowed = await filterSmsSiblings!(userId, transactionId,
+          [...siblings.last4MissingIds, ...siblings.cardLinkMissingIds]);
+      siblings = _BankScopedSiblings(
+          siblings.last4MissingIds.where(allowed.contains).toList(),
+          siblings.cardLinkMissingIds.where(allowed.contains).toList());
+    }
     logInfo('BANK_SCOPED_CANDIDATES bank=$bank type=$type '
         'last4Missing=${siblings.last4MissingIds.length} '
         'cardLinkMissing=${siblings.cardLinkMissingIds.length}');

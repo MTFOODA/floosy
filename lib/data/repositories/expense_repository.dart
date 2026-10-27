@@ -1,9 +1,10 @@
-import '../models/transaction_model.dart';
+import '../../domain/repositories/expense_repository.dart' as domain;
+import '../../domain/entities/transaction_model.dart';
 import '../remote/datasources/expense_remote_datasource.dart';
 import '../local/datasources/expense_local_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class ExpenseRepository {
+class ExpenseRepository implements domain.ExpenseRepository {
   final ExpenseRemoteDataSource remoteDataSource;
   final ExpenseLocalDataSource? localDataSource;
 
@@ -14,6 +15,7 @@ class ExpenseRepository {
 
   /// Create an expense and persist it offline-first. When [localDataSource]
   /// is available the row is written locally first, then synced to Supabase.
+  @override
   Future<Expense> createExpenseRecord(Expense expense) async {
     try {
       if (localDataSource != null) {
@@ -28,6 +30,7 @@ class ExpenseRepository {
 
   /// Sync item-usage rows to Supabase (best effort). Local persistence of item
   /// usage is handled inside the money engine's atomic transaction.
+  @override
   Future<void> recordItemUsages(List<ItemUsage> usages) async {
     for (final usage in usages) {
       try {
@@ -39,6 +42,7 @@ class ExpenseRepository {
   }
 
   /// Get all expenses for a user
+  @override
   Future<List<Expense>> getExpenses(String userId) async {
     try {
       return await remoteDataSource.getExpenses(userId);
@@ -49,6 +53,7 @@ class ExpenseRepository {
   }
 
   /// Get expense by ID
+  @override
   Future<Expense?> getExpense(String expenseId) async {
     try {
       return await remoteDataSource.getExpense(expenseId);
@@ -59,6 +64,7 @@ class ExpenseRepository {
   }
 
   /// Create a new expense
+  @override
   Future<Expense> createExpense({
     required String userId,
     required String categoryId,
@@ -92,6 +98,7 @@ class ExpenseRepository {
   }
 
   /// Update an existing expense
+  @override
   Future<Expense> updateExpense(Expense expense) async {
     try {
       return await remoteDataSource.updateExpense(expense);
@@ -102,6 +109,7 @@ class ExpenseRepository {
   }
 
   /// Delete an expense
+  @override
   Future<void> deleteExpense(String expenseId) async {
     try {
       await remoteDataSource.deleteExpense(expenseId);
@@ -112,6 +120,7 @@ class ExpenseRepository {
   }
 
   /// Get expenses for a specific month
+  @override
   Future<List<Expense>> getMonthlyExpenses({
     required String userId,
     required int year,
@@ -130,6 +139,7 @@ class ExpenseRepository {
   }
 
   /// Get expenses by category
+  @override
   Future<List<Expense>> getExpensesByCategory({
     required String userId,
     required String categoryId,
@@ -144,6 +154,7 @@ class ExpenseRepository {
   }
 
   /// Get total expenses for a user in a date range
+  @override
   Future<int> getTotalExpenses({
     required String userId,
     required DateTime startDate,
@@ -163,6 +174,7 @@ class ExpenseRepository {
   }
 
   /// Create expense items for an expense
+  @override
   Future<void> addExpenseItems({
     required String expenseId,
     required List<ExpenseItem> items,
@@ -178,6 +190,7 @@ class ExpenseRepository {
   }
 
   /// Get items in an expense
+  @override
   Future<List<ExpenseItem>> getExpenseItems(String expenseId) async {
     try {
       return await remoteDataSource.getExpenseItems(expenseId);

@@ -4,7 +4,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/display_text_guard.dart';
 import '../../../../core/utils/money_formatter.dart';
-import '../../../../data/models/transaction_model.dart';
+import '../../../../domain/entities/transaction_model.dart';
 
 /// Localized display name for a transaction type.
 String transactionTypeLabel(AppLocalizations l, TransactionType type) {
@@ -54,8 +54,12 @@ class TransactionGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = transactions.fold<int>(0,
-        (sum, t) => sum + (isCredit(t.type) ? t.amountMinor : -t.amountMinor));
+    final total = transactions
+        .where((t) => t.status == TransactionStatus.confirmed)
+        .fold<int>(
+            0,
+            (sum, t) =>
+                sum + (isCredit(t.type) ? t.amountMinor : -t.amountMinor));
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -85,12 +89,24 @@ class TransactionGroup extends StatelessWidget {
               isCredit: isCredit(t.type),
               icon: typeIcon(t.type),
               isCardUnresolved: unresolvedCardIds.contains(t.id),
-              onTap: onTransactionTap == null ? null : () => onTransactionTap!(t))),
+              onTap: onTransactionTap == null
+                  ? null
+                  : () => onTransactionTap!(t))),
         ],
       ),
     );
   }
 }
+
+String _transactionSymbol(TransactionType type) => switch (type) {
+      TransactionType.atm_withdrawal => '🏧',
+      TransactionType.cash_expense => '💵',
+      TransactionType.purchase => '🛍️',
+      TransactionType.transfer_in || TransactionType.transfer_out => '🏦',
+      TransactionType.income => '💰',
+      TransactionType.refund || TransactionType.reversal => '↩️',
+      TransactionType.adjustment => '⚖️',
+    };
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
@@ -135,118 +151,126 @@ class TransactionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
         child: Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.fc.primarySurface,
-        borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
-        border: Border.all(color: context.fc.borderSubtle),
-      ),
-      child: Row(
-        children: [
-          Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                  color: context.fc.elevatedSurface,
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, color: context.fc.textSecondary, size: 20)),
-          const SizedBox(width: 14),
-          Expanded(
-              child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.fc.primarySurface,
+            borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
+            border: Border.all(color: context.fc.borderSubtle),
+          ),
+          child: Row(
             children: [
-              // Bank / merchant name (for SMS transactions this is the
-              // identified bank, or the merchant when one was parsed).
-              // SMS-derived labels pass through the corruption guard: a
-              // clearly garbled label falls back to the type label instead of
-              // mojibake; legitimate Arabic/English names render untouched.
-              Text(
-                  DisplayTextGuard.label(
-                    transaction.merchantName ??
-                        transactionTypeLabel(l, transaction.type),
-                    fallback: transactionTypeLabel(l, transaction.type),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: context.fc.textPrimary)),
-              const SizedBox(height: 3),
-              Row(
+              Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: context.fc.elevatedSurface,
+                      borderRadius: BorderRadius.circular(14)),
+                  child: Text(_transactionSymbol(transaction.type),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 21))),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                        // Type + currency on one line.
-                        '${transactionTypeLabel(l, transaction.type)} · ${transaction.currency}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12, color: context.fc.textMuted)),
-                  ),
-                  if (hasLast4) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: context.fc.elevatedSurface,
-                        borderRadius: BorderRadius.circular(6),
+                  // Bank / merchant name (for SMS transactions this is the
+                  // identified bank, or the merchant when one was parsed).
+                  // SMS-derived labels pass through the corruption guard: a
+                  // clearly garbled label falls back to the type label instead of
+                  // mojibake; legitimate Arabic/English names render untouched.
+                  Text(
+                      DisplayTextGuard.label(
+                        transaction.merchantName ??
+                            transactionTypeLabel(l, transaction.type),
+                        fallback: transactionTypeLabel(l, transaction.type),
                       ),
-                      child: Text('••${transaction.cardLast4}',
-                          style: TextStyle(
-                              fontSize: 10,
-                              letterSpacing: 0.5,
-                              color: context.fc.textSecondary)),
-                    ),
-                  ],
-                  // RED DOT: the transaction has no resolvable card. It is
-                  // deliberately NOT attributed to the selected card; it is
-                  // excluded from every card's figures until the user adds or
-                  // corrects the card number, at which point this dot clears.
-                  if (isCardUnresolved) ...[
-                    const SizedBox(width: 6),
-                    Semantics(
-                      label: 'Unassigned to a card',
-                      button: onResolveCard != null,
-                      child: GestureDetector(
-                        onTap: onResolveCard,
-                        child: Container(
-                          width: 9,
-                          height: 9,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: context.fc.textPrimary)),
+                  const SizedBox(height: 3),
+                  if (transaction.status == TransactionStatus.pending)
+                    Text(l['needsReview'],
+                        style: const TextStyle(
+                            color: FloosyDesign.negative, fontSize: 12)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                            // Type + currency on one line.
+                            '${transactionTypeLabel(l, transaction.type)} · ${transaction.currency}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12, color: context.fc.textMuted)),
+                      ),
+                      if (hasLast4) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: context.fc.elevatedSurface,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('••${transaction.cardLast4}',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  letterSpacing: 0.5,
+                                  color: context.fc.textSecondary)),
+                        ),
+                      ],
+                      // RED DOT: the transaction has no resolvable card. It is
+                      // deliberately NOT attributed to the selected card; it is
+                      // excluded from every card's figures until the user adds or
+                      // corrects the card number, at which point this dot clears.
+                      if (isCardUnresolved) ...[
+                        const SizedBox(width: 6),
+                        Semantics(
+                          label: 'Unassigned to a card',
+                          button: onResolveCard != null,
+                          child: GestureDetector(
+                            onTap: onResolveCard,
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    ],
+                  ),
+                ],
+              )),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                      '${isCredit ? '+' : '-'}'
+                      '${formatMoney(transaction.amountMinor)} ${transaction.currency}',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isCredit
+                              ? FloosyDesign.positive
+                              : FloosyDesign.negative)),
+                  const SizedBox(height: 3),
+                  Text('$dateStr  $timeStr',
+                      style:
+                          TextStyle(fontSize: 10, color: context.fc.textMuted)),
                 ],
               ),
             ],
-          )),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                  '${isCredit ? '+' : '-'}'
-                  '${formatMoney(transaction.amountMinor)} ${transaction.currency}',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isCredit
-                          ? FloosyDesign.positive
-                          : FloosyDesign.negative)),
-              const SizedBox(height: 3),
-              Text('$dateStr  $timeStr',
-                  style: TextStyle(fontSize: 10, color: context.fc.textMuted)),
-            ],
           ),
-        ],
-      ),
         ),
       ),
     );

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/theme/app_design_system.dart';
-import '../../../../data/models/detected_card_model.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 
 /// Dialog for configuring a credit card's settings.
-class CreditCardConfigDialog extends ConsumerStatefulWidget {
+class CreditCardConfigDialog extends StatefulWidget {
   final String cardId;
   final CreditCardConfig? currentConfig;
 
@@ -17,12 +17,10 @@ class CreditCardConfigDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CreditCardConfigDialog> createState() =>
-      _CreditCardConfigDialogState();
+  State<CreditCardConfigDialog> createState() => _CreditCardConfigDialogState();
 }
 
-class _CreditCardConfigDialogState
-    extends ConsumerState<CreditCardConfigDialog> {
+class _CreditCardConfigDialogState extends State<CreditCardConfigDialog> {
   late TextEditingController _limitController;
   late bool _cashWithdrawalEnabled;
   bool? _isCreditCard;
@@ -48,7 +46,7 @@ class _CreditCardConfigDialogState
   Future<void> _save() async {
     final l = AppLocalizations.s(context);
 
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) {
       if (mounted) Navigator.of(context).pop();
       return;

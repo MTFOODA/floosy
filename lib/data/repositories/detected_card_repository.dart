@@ -1,13 +1,14 @@
+import '../../domain/repositories/detected_card_repository.dart' as domain;
 import 'package:uuid/uuid.dart';
 import '../../core/utils/app_logger.dart';
-import '../models/detected_card_model.dart';
-import '../services/card_ownership.dart';
+import '../../domain/entities/detected_card_model.dart';
+import '../../domain/services/card_ownership.dart';
 import '../local/datasources/detected_card_local_datasource.dart';
 import '../remote/datasources/detected_card_remote_datasource.dart';
 
 /// Repository for detected bank cards. Persists across restarts and keeps
 /// a transaction count per card. Uniqueness is guaranteed by last4 + bank.
-class DetectedCardRepository {
+class DetectedCardRepository implements domain.DetectedCardRepository {
   final DetectedCardLocalDataSource local;
   final DetectedCardRemoteDataSource? remote;
   final _uuid = const Uuid();
@@ -15,6 +16,7 @@ class DetectedCardRepository {
   DetectedCardRepository({required this.local, this.remote});
 
   /// Returns all detected cards for [userId], sorted by last4.
+  @override
   Future<List<DetectedCard>> getCards(String userId) async {
     final cards = await local.getCards(userId);
     cards.sort((a, b) => a.last4.compareTo(b.last4));
@@ -31,6 +33,7 @@ class DetectedCardRepository {
   /// "CIB Bank" all resolve to the SAME card identity rather than silently
   /// creating duplicates. The first-stored display name is preserved so the UI
   /// keeps showing what the user recognised.
+  @override
   Future<DetectedCard> upsertCard({
     required String userId,
     required String last4,
@@ -41,8 +44,7 @@ class DetectedCardRepository {
     final cards = await local.getCards(userId);
     final bank = normalizeBankIdentity(bankName);
     final existingIdx = cards.indexWhere(
-      (c) =>
-          c.last4 == last4 && normalizeBankIdentity(c.bankName) == bank,
+      (c) => c.last4 == last4 && normalizeBankIdentity(c.bankName) == bank,
     );
 
     if (existingIdx >= 0) {
@@ -74,7 +76,7 @@ class DetectedCardRepository {
       transactionCount: (transactionCountDelta ?? 0),
       appearance: appearance ??
           CardAppearance(
-              presetIndex: cards.length % CardPresets.presets.length),
+              presetIndex: cards.length % CardAppearance.presetCount),
     );
     cards.add(created);
     await local.saveCards(userId, cards);
@@ -93,6 +95,7 @@ class DetectedCardRepository {
   /// The lookup counterpart of [upsertCard] and the read path every consumer
   /// uses to ask "does this user already know this Bank + Last 4 card?". It
   /// never creates anything.
+  @override
   Future<DetectedCard?> findCardIdentity({
     required String userId,
     required String last4,
@@ -108,6 +111,7 @@ class DetectedCardRepository {
   }
 
   /// Persist an independently-customized appearance for one card.
+  @override
   Future<void> updateAppearance(
       String userId, String cardId, CardAppearance appearance) async {
     final cards = await local.getCards(userId);
@@ -117,10 +121,12 @@ class DetectedCardRepository {
     await local.saveCards(userId, cards);
   }
 
+  @override
   Future<void> updateDetectedCard(DetectedCard card) async {
     await remote?.upsertCard(card);
   }
 
+  @override
   Future<void> recomputeTransactionCountsForCards(
     String userId,
     int Function(DetectedCard card) countFor,
@@ -146,14 +152,16 @@ class DetectedCardRepository {
   }
 
   /// Recompute transaction counts for all cards from stored transactions.
+  @override
   Future<void> recomputeTransactionCounts(
-    String userId, int Function(String cardLast4) countFor) async {
+      String userId, int Function(String cardLast4) countFor) async {
     await recomputeTransactionCountsForCards(
       userId,
       (card) => countFor(card.last4),
     );
   }
 
+  @override
   Future<void> deleteCard(String userId, String cardId) async {
     final cards = await local.getCards(userId);
     cards.removeWhere((c) => c.id == cardId);
@@ -161,6 +169,7 @@ class DetectedCardRepository {
   }
 
   /// Returns the card's eye (balance visibility) state.
+  @override
   Future<bool> getCardEyeVisible(String userId, String cardId) async {
     final cards = await local.getCards(userId);
     final card = cards.firstWhere((c) => c.id == cardId);
@@ -168,6 +177,7 @@ class DetectedCardRepository {
   }
 
   /// Toggles the card's eye visibility and returns the new state.
+  @override
   Future<bool> toggleCardEye(String userId, String cardId) async {
     final cards = await local.getCards(userId);
     final idx = cards.indexWhere((c) => c.id == cardId);
@@ -183,6 +193,7 @@ class DetectedCardRepository {
   }
 
   /// Sets the card's eye visibility directly.
+  @override
   Future<void> setCardEyeVisible(
       String userId, String cardId, bool visible) async {
     final cards = await local.getCards(userId);
@@ -195,6 +206,7 @@ class DetectedCardRepository {
     await local.saveCards(userId, cards);
   }
 
+  @override
   Future<DetectedCard?> getCardById(String userId, String cardId) async {
     final cards = await local.getCards(userId);
     for (final card in cards) {
@@ -203,6 +215,7 @@ class DetectedCardRepository {
     return null;
   }
 
+  @override
   Future<void> setCardEye(String userId, String cardId, bool visible) =>
       setCardEyeVisible(userId, cardId, visible);
 
@@ -213,6 +226,7 @@ class DetectedCardRepository {
   /// untouched — the cash-withdrawal flag is an ELIGIBILITY switch, never a
   /// financial operation (requirement #12: an unrelated card-setting update
   /// must never overwrite the card's current financial state).
+  @override
   Future<void> setCashWithdrawalEnabled(
       String userId, String cardId, bool enabled) async {
     final cards = await local.getCards(userId);
@@ -238,6 +252,7 @@ class DetectedCardRepository {
   ///     `My Balance <= Fixed Amount` true.
   ///
   /// The opening adjustment is never allowed to exceed the Fixed Amount.
+  @override
   Future<void> setCreditCardConfig({
     required String userId,
     required String cardId,
@@ -277,6 +292,7 @@ class DetectedCardRepository {
 
   /// Returns the credit card configuration for a card, or null if not a
   /// credit card (requirement #13).
+  @override
   Future<CreditCardConfig?> getCreditCardConfig(
       String userId, String cardId) async {
     final card = await getCardById(userId, cardId);
@@ -294,6 +310,7 @@ class DetectedCardRepository {
   /// Attempts to add (repay) balance to a credit card.
   /// Returns the new balance, or throws if it would exceed the limit
   /// (requirement #18, #21).
+  @override
   Future<int> addCreditBalance({
     required String userId,
     required String cardId,
@@ -326,6 +343,7 @@ class DetectedCardRepository {
 
   /// Attempts to deduct balance from a credit card (e.g. for a purchase).
   /// Returns the new balance, or throws if insufficient funds.
+  @override
   Future<int> deductCreditBalance({
     required String userId,
     required String cardId,

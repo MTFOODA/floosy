@@ -1,13 +1,15 @@
-import '../models/item_model.dart';
+import '../../domain/repositories/category_repository.dart' as domain;
+import '../../domain/entities/item_model.dart';
 import '../remote/datasources/category_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class CategoryRepository {
+class CategoryRepository implements domain.CategoryRepository {
   final CategoryRemoteDataSource remoteDataSource;
 
   CategoryRepository({required this.remoteDataSource});
 
   /// Get all system categories
+  @override
   Future<List<Category>> getSystemCategories() async {
     try {
       return await remoteDataSource.getSystemCategories();
@@ -18,6 +20,7 @@ class CategoryRepository {
   }
 
   /// Get all user categories (including system)
+  @override
   Future<List<Category>> getUserCategories(String userId) async {
     try {
       return await remoteDataSource.getUserCategories(userId);
@@ -28,6 +31,7 @@ class CategoryRepository {
   }
 
   /// Get category by ID
+  @override
   Future<Category?> getCategory(String categoryId) async {
     try {
       return await remoteDataSource.getCategory(categoryId);
@@ -38,6 +42,7 @@ class CategoryRepository {
   }
 
   /// Create a new custom category
+  @override
   Future<Category> createCategory({
     required String userId,
     required String name,
@@ -67,6 +72,7 @@ class CategoryRepository {
   }
 
   /// Update a category
+  @override
   Future<Category> updateCategory(Category category) async {
     try {
       return await remoteDataSource.updateCategory(category);
@@ -77,6 +83,7 @@ class CategoryRepository {
   }
 
   /// Delete a category
+  @override
   Future<void> deleteCategory(String categoryId) async {
     try {
       await remoteDataSource.deleteCategory(categoryId);
@@ -87,6 +94,7 @@ class CategoryRepository {
   }
 
   /// Get expense categories for a user
+  @override
   Future<List<Category>> getExpenseCategories(String userId) async {
     try {
       final categories = await getUserCategories(userId);
@@ -100,6 +108,7 @@ class CategoryRepository {
   }
 
   /// Get income categories for a user
+  @override
   Future<List<Category>> getIncomeCategories(String userId) async {
     try {
       final categories = await getUserCategories(userId);
@@ -111,6 +120,7 @@ class CategoryRepository {
   }
 
   /// Get subcategories for a parent category
+  @override
   Future<List<Category>> getSubcategories(String parentId) async {
     try {
       final categories = await remoteDataSource.getSubcategories(parentId);
@@ -122,6 +132,7 @@ class CategoryRepository {
   }
 
   /// Deactivate a category
+  @override
   Future<void> deactivateCategory(String categoryId) async {
     try {
       final category = await remoteDataSource.getCategory(categoryId);

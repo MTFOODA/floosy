@@ -1,13 +1,15 @@
-import '../models/budget_model.dart';
+import '../../domain/repositories/budget_repository.dart' as domain;
+import '../../domain/entities/budget_model.dart';
 import '../remote/datasources/budget_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class BudgetRepository {
+class BudgetRepository implements domain.BudgetRepository {
   final BudgetRemoteDataSource remoteDataSource;
 
   BudgetRepository({required this.remoteDataSource});
 
   /// Get all budgets for a user
+  @override
   Future<List<Budget>> getBudgets(String userId) async {
     try {
       return await remoteDataSource.getBudgets(userId);
@@ -18,6 +20,7 @@ class BudgetRepository {
   }
 
   /// Get active budgets for a user
+  @override
   Future<List<Budget>> getActiveBudgets(String userId) async {
     try {
       final budgets = await remoteDataSource.getBudgets(userId);
@@ -33,6 +36,7 @@ class BudgetRepository {
   }
 
   /// Get budget by ID
+  @override
   Future<Budget?> getBudget(String budgetId) async {
     try {
       return await remoteDataSource.getBudget(budgetId);
@@ -43,6 +47,7 @@ class BudgetRepository {
   }
 
   /// Create a new budget
+  @override
   Future<Budget> createBudget({
     required String userId,
     required String name,
@@ -73,6 +78,7 @@ class BudgetRepository {
   }
 
   /// Update a budget
+  @override
   Future<Budget> updateBudget(Budget budget) async {
     try {
       return await remoteDataSource.updateBudget(budget);
@@ -83,6 +89,7 @@ class BudgetRepository {
   }
 
   /// Delete a budget
+  @override
   Future<void> deleteBudget(String budgetId) async {
     try {
       await remoteDataSource.deleteBudget(budgetId);
@@ -93,6 +100,7 @@ class BudgetRepository {
   }
 
   /// Set budget limit for a category
+  @override
   Future<BudgetCategory> setBudgetCategory({
     required String budgetId,
     required String categoryId,
@@ -111,6 +119,7 @@ class BudgetRepository {
   }
 
   /// Get budget categories
+  @override
   Future<List<BudgetCategory>> getBudgetCategories(String budgetId) async {
     try {
       return await remoteDataSource.getBudgetCategories(budgetId);
@@ -121,6 +130,7 @@ class BudgetRepository {
   }
 
   /// Remove a category from budget
+  @override
   Future<void> removeBudgetCategory({
     required String budgetId,
     required String categoryId,
@@ -134,6 +144,7 @@ class BudgetRepository {
   }
 
   /// Get current spending against budget
+  @override
   Future<Map<String, int>> getCurrentSpending(String budgetId) async {
     try {
       return await remoteDataSource.getCurrentSpending(budgetId);
@@ -144,6 +155,7 @@ class BudgetRepository {
   }
 
   /// Check if budget category is exceeded
+  @override
   Future<bool> isCategoryExceeded({
     required String budgetId,
     required String categoryId,
@@ -168,6 +180,7 @@ class BudgetRepository {
   }
 
   /// Deactivate a budget
+  @override
   Future<void> deactivateBudget(String budgetId) async {
     try {
       final budget = await remoteDataSource.getBudget(budgetId);

@@ -1,9 +1,11 @@
+import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/providers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/display_text_guard.dart';
-import '../../../../data/models/detected_card_model.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 import 'credit_card_config_dialog.dart';
 import 'card_customization_sheet.dart';
 
@@ -17,7 +19,7 @@ import 'card_customization_sheet.dart';
 ///   (requirement #11, part of credit card integration).
 /// - Tapping the **credit card icon** (only shown when card is a credit card)
 ///   opens the credit card configuration dialog (requirement #13, #17).
-class DetectedBankCard extends ConsumerStatefulWidget {
+class DetectedBankCard extends StatefulWidget {
   final DetectedCard card;
 
   /// Optional callback invoked when the user taps the pencil icon. When null
@@ -37,13 +39,13 @@ class DetectedBankCard extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState createState() => _DetectedBankCardState();
+  State<DetectedBankCard> createState() => _DetectedBankCardState();
 }
 
-class _DetectedBankCardState extends ConsumerState<DetectedBankCard> {
+class _DetectedBankCardState extends State<DetectedBankCard> {
   bool? _eyeVisible;
 
-  String? get _userId => ref.read(currentUserIdProvider);
+  String? get _userId => context.read<AuthCubit>().state.userId;
 
   @override
   void initState() {
@@ -54,7 +56,7 @@ class _DetectedBankCardState extends ConsumerState<DetectedBankCard> {
   Future<void> _loadEyeState() async {
     final userId = _userId;
     if (userId == null) return;
-    final repo = ref.read(detectedCardRepositoryProvider);
+    final repo = context.read<CardsCubit>();
     final visible = await repo.getCardEyeVisible(userId, widget.card.id);
     if (mounted) {
       setState(() => _eyeVisible = visible);
@@ -64,19 +66,19 @@ class _DetectedBankCardState extends ConsumerState<DetectedBankCard> {
   Future<void> _toggleEye() async {
     final userId = _userId;
     if (userId == null) return;
-    final repo = ref.read(detectedCardRepositoryProvider);
+    final repo = context.read<CardsCubit>();
     final newVisible = await repo.toggleCardEye(userId, widget.card.id);
     if (mounted) {
       setState(() => _eyeVisible = newVisible);
       // Refresh the card list so card-scoped balance visuals stay in sync.
-      ref.invalidate(detectedCardsProvider);
+      context.read<CardsCubit>().reload();
     }
   }
 
   Future<void> _openCreditConfig() async {
     final userId = _userId;
     if (userId == null) return;
-    final repo = ref.read(detectedCardRepositoryProvider);
+    final repo = context.read<CardsCubit>();
 
     // ALWAYS resolve the card FRESH from the store before opening the
     // dialog. A stale build-time snapshot would pre-fill the dialog with an
@@ -103,48 +105,8 @@ class _DetectedBankCardState extends ConsumerState<DetectedBankCard> {
     );
 
     if (result != null) {
-      if (result.isCreditCard) {
-        // The Fixed Amount text was pre-filled from the FRESH card, so an
-        // unchanged limit means the user ONLY toggled the cash-withdrawal
-        // switch. In that case apply ONLY that flag (requirement #12): the
-        // Fixed-Amount/clamp flow below must never be triggered by an
-        // eligibility toggle, because a clamp rewrites the opening balance.
-        if (freshCard.isCreditCard &&
-            result.creditLimitMinor == freshCard.creditLimitMinor) {
-          await repo.setCashWithdrawalEnabled(
-              userId, freshCard.id, result.cashWithdrawalEnabled);
-        } else {
-          // Fixed Amount changes go through the money business layer so the
-          // card's financial state stays valid: My Balance is clamped to the
-          // new Fixed Amount when the limit is reduced, and the extra
-          // headroom becomes addable when the limit is raised (requirement
-          // #4). A newly configured credit card always starts with
-          // My Balance = 0.
-          await ref.read(moneyRepositoryProvider).setFixedAmountForCard(
-                userId: userId,
-                cardLast4: freshCard.last4,
-                bankName: freshCard.bankName,
-                fixedAmountMinor: result.creditLimitMinor,
-                cashWithdrawalEnabled: result.cashWithdrawalEnabled,
-              );
-        }
-      } else {
-        // Switched back to a debit card: clear every credit-card field.
-        await repo.setCreditCardConfig(
-          userId: userId,
-          cardId: freshCard.id,
-          isCreditCard: false,
-          creditLimitMinor: 0,
-          currentBalanceMinor: 0,
-          cashWithdrawalEnabled: false,
-          updatedAt: DateTime.now(),
-        );
-      }
-      ref.invalidate(detectedCardsProvider);
-      ref.invalidate(selectedCardMoneySummaryProvider);
-      ref.invalidate(cardPocketCashVisibleProvider(freshCard.last4));
+      await repo.configure(userId: userId, original: freshCard, result: result);
     }
-    ref.invalidate(detectedCardsProvider);
   }
 
   void _openCustomization() {
@@ -155,15 +117,16 @@ class _DetectedBankCardState extends ConsumerState<DetectedBankCard> {
       onEdit();
       return;
     }
+    final cubit = context.read<CardsCubit>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CardCustomizationSheet(
         card: widget.card,
-        repository: ref.read(detectedCardRepositoryProvider),
+        repository: cubit,
       ),
-    ).then((_) => ref.invalidate(detectedCardsProvider));
+    ).then((_) => cubit.reload());
   }
 
   @override

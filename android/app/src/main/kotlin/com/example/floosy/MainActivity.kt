@@ -8,7 +8,7 @@ import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.content.ContextCompat
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -27,7 +27,7 @@ import java.util.concurrent.Executors
  * (UI) thread, so the cursor loop runs on a single background worker and
  * the channel reply is posted back on the main looper.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     companion object {
         private const val TAG = "FloosySMS"

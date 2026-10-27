@@ -112,8 +112,8 @@ class SmsSyncState {
       other.pagesScanned == pagesScanned;
 
   @override
-  int get hashCode => Object.hash(historyComplete, walkCursor, pendingSince,
-      lastProcessedAt, pagesScanned);
+  int get hashCode => Object.hash(
+      historyComplete, walkCursor, pendingSince, lastProcessedAt, pagesScanned);
 
   @override
   String toString() => 'SmsSyncState(historyComplete=$historyComplete, '

@@ -1,37 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/providers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/pocket_cash/presentation/cubit/pocket_cash_cubit.dart';
+import 'package:floosy/core/state/load_state.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../data/models/item_model.dart';
+import '../../../../domain/entities/item_model.dart';
 import '../../../../theme/app_theme.dart';
 
 /// Pocket Cash ledger view: current balance derived from cash_movements
 /// plus the movement history. Balances are never mutated directly.
-class PocketCashScreen extends ConsumerStatefulWidget {
+class PocketCashScreen extends StatefulWidget {
   const PocketCashScreen({super.key});
 
   @override
-  ConsumerState<PocketCashScreen> createState() => _PocketCashScreenState();
+  State<PocketCashScreen> createState() => _PocketCashScreenState();
 }
 
-class _PocketCashScreenState extends ConsumerState<PocketCashScreen> {
-  Future<(int, List<CashMovement>)>? _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-  }
-
-  Future<(int, List<CashMovement>)> _load() async {
-    final userId = ref.read(currentUserIdProvider);
-    if (userId == null) return (0, <CashMovement>[]);
-    final repo = ref.read(cashWalletRepositoryProvider);
-    final balance = await repo.getCashBalance(userId);
-    final movements = await repo.getMovements(userId);
-    return (balance, movements);
-  }
-
+class _PocketCashScreenState extends State<PocketCashScreen> {
   String _formatMinor(int minor) {
     final value = minor / 100;
     return value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
@@ -65,16 +50,15 @@ class _PocketCashScreenState extends ConsumerState<PocketCashScreen> {
         icon: const Icon(Icons.add),
         label: Text(l['addCash']),
       ),
-      body: FutureBuilder<(int, List<CashMovement>)>(
-        future: _future,
+      body: BlocBuilder<PocketCashCubit, LoadState<(int, List<CashMovement>)>>(
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
             return Center(child: Text(l['error']));
           }
-          final (balance, movements) = snapshot.data ?? (0, <CashMovement>[]);
+          final (balance, movements) = snapshot.value ?? (0, <CashMovement>[]);
           return Column(
             children: [
               Container(
@@ -182,9 +166,9 @@ class _PocketCashScreenState extends ConsumerState<PocketCashScreen> {
     final amount = double.tryParse(controller.text);
     if (amount == null || amount <= 0) return;
 
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    final repo = ref.read(cashWalletRepositoryProvider);
+    final repo = context.read<PocketCashCubit>();
     final wallet = await repo.getOrCreateWallet(userId, 'EGP');
     await repo.addCash(
       userId: userId,
@@ -192,6 +176,6 @@ class _PocketCashScreenState extends ConsumerState<PocketCashScreen> {
       amountMinor: (amount * 100).round(),
       description: l['manualCash'],
     );
-    if (mounted) setState(() => _future = _load());
+    if (mounted) context.read<PocketCashCubit>().reload();
   }
 }

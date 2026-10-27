@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/providers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/ai/presentation/cubit/ai_chat_cubit.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
-import '../../../../core/utils/money_formatter.dart';
 import '../widgets/ai_widgets.dart';
 
-class AIChatScreen extends ConsumerStatefulWidget {
+class AIChatScreen extends StatefulWidget {
   const AIChatScreen({super.key});
 
   @override
-  ConsumerState<AIChatScreen> createState() => _AIChatScreenState();
+  State<AIChatScreen> createState() => _AIChatScreenState();
 }
 
-class _AIChatScreenState extends ConsumerState<AIChatScreen> {
-  final List<_ChatMessage> _messages = [];
+class _AIChatScreenState extends State<AIChatScreen> {
   final _inputController = TextEditingController();
-  bool _isTyping = false;
+  List<ChatMessage> get _messages => context.read<AIChatCubit>().state.messages;
+  bool get _isTyping => context.read<AIChatCubit>().state.typing;
 
   static const _suggestions = [
     "What's my total spending this month?",
@@ -31,9 +30,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final l = AppLocalizations.s(context);
-      setState(() {
-        _messages.add(_ChatMessage(text: l['askQuestion'], isUser: false));
-      });
+      context.read<AIChatCubit>().greet(l['askQuestion']);
     });
   }
 
@@ -44,73 +41,15 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-    final userId = ref.read(currentUserIdProvider);
-    if (userId == null) return;
-    final l = AppLocalizations.s(context);
-
-    setState(() {
-      _messages.add(_ChatMessage(text: text, isUser: true));
-      _isTyping = true;
-    });
+    final cubit = context.read<AIChatCubit>();
+    if (cubit.state.typing || text.trim().isEmpty) return;
     _inputController.clear();
-
-    String reply;
-    try {
-      reply = await _answer(text, userId);
-    } catch (e) {
-      reply = l['aiError'];
-    }
-
-    if (mounted) {
-      setState(() {
-        _messages.add(_ChatMessage(text: reply, isUser: false));
-        _isTyping = false;
-      });
-    }
-  }
-
-  Future<String> _answer(String question, String userId) async {
-    final transactionRepo = ref.read(transactionRepositoryProvider);
-    final moneyRepo = ref.read(moneyRepositoryProvider);
-    final itemRepo = ref.read(itemRepositoryProvider);
-    final budgetRepo = ref.read(budgetRepositoryProvider);
-
-    final transactions =
-        await transactionRepo.getTransactions(userId: userId, limit: 200);
-    final summary = await moneyRepo.getMoneySummary(userId);
-    final items = await itemRepo.getActiveItems(userId);
-    final budgets = await budgetRepo.getActiveBudgets(userId);
-
-    final q = question.toLowerCase();
-
-    if (q.contains('spending') || q.contains('spend') || q.contains('total')) {
-      return 'Your total spending this month is ${formatMoney(summary.deductedMinor)}. You have ${transactions.length} transactions recorded.';
-    }
-    if (q.contains('cash') || q.contains('pocket')) {
-      return 'Your pocket cash balance is ${formatMoney(summary.pocketCashMinor)}. This is your physical cash available after ATM withdrawals.';
-    }
-    if (q.contains('balance') || q.contains('bank')) {
-      return 'Your total bank balance across all accounts is ${formatMoney(summary.myBalanceMinor)}. This includes all your bank accounts.';
-    }
-    if (q.contains('category') || q.contains('most')) {
-      return 'Based on your transactions, your spending is distributed across different categories. Keep tracking your expenses to get detailed category insights.';
-    }
-    if (q.contains('top') || q.contains('expense')) {
-      return 'I can see ${transactions.length} transactions in your account. The largest transaction this period was ${formatMoney(transactions.isNotEmpty ? transactions.first.amountMinor : 0)}.';
-    }
-    if (q.contains('budget')) {
-      return 'You have ${budgets.length} active budgets. Keep monitoring your spending to stay within budget limits.';
-    }
-    if (q.contains('item') || q.contains('items')) {
-      return 'You have ${items.length} active items for quick expense tracking. These help you record cash expenses with a single tap.';
-    }
-
-    return 'I can help you understand your finances. Try asking about your total spending, cash balance, bank balance, budgets, or items. I read from your real financial data to give accurate answers.';
+    await cubit.send(text, errorText: AppLocalizations.s(context)['aiError']);
   }
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AIChatCubit>();
     return Scaffold(
       backgroundColor: context.fc.background,
       body: SafeArea(
@@ -273,10 +212,4 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
       ),
     );
   }
-}
-
-class _ChatMessage {
-  final String text;
-  final bool isUser;
-  _ChatMessage({required this.text, required this.isUser});
 }

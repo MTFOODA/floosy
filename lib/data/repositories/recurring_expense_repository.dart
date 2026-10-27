@@ -1,13 +1,15 @@
-import '../models/budget_model.dart';
+import '../../domain/repositories/recurring_expense_repository.dart' as domain;
+import '../../domain/entities/budget_model.dart';
 import '../remote/datasources/recurring_expense_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class RecurringExpenseRepository {
+class RecurringExpenseRepository implements domain.RecurringExpenseRepository {
   final RecurringExpenseRemoteDataSource remoteDataSource;
 
   RecurringExpenseRepository({required this.remoteDataSource});
 
   /// Get all recurring expenses for a user
+  @override
   Future<List<RecurringExpense>> getRecurringExpenses(String userId) async {
     try {
       return await remoteDataSource.getRecurringExpenses(userId);
@@ -18,6 +20,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get active recurring expenses for a user
+  @override
   Future<List<RecurringExpense>> getActiveRecurringExpenses(
       String userId) async {
     try {
@@ -30,6 +33,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get recurring expense by ID
+  @override
   Future<RecurringExpense?> getRecurringExpense(String expenseId) async {
     try {
       return await remoteDataSource.getRecurringExpense(expenseId);
@@ -40,6 +44,7 @@ class RecurringExpenseRepository {
   }
 
   /// Create a new recurring expense
+  @override
   Future<RecurringExpense> createRecurringExpense({
     required String userId,
     required String name,
@@ -77,6 +82,7 @@ class RecurringExpenseRepository {
   }
 
   /// Update a recurring expense
+  @override
   Future<RecurringExpense> updateRecurringExpense(
       RecurringExpense expense) async {
     try {
@@ -88,6 +94,7 @@ class RecurringExpenseRepository {
   }
 
   /// Delete a recurring expense
+  @override
   Future<void> deleteRecurringExpense(String expenseId) async {
     try {
       await remoteDataSource.deleteRecurringExpense(expenseId);
@@ -98,6 +105,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get occurrences of a recurring expense
+  @override
   Future<List<RecurringExpenseOccurrence>> getOccurrences(
       String recurringExpenseId) async {
     try {
@@ -109,6 +117,7 @@ class RecurringExpenseRepository {
   }
 
   /// Mark occurrence as paid
+  @override
   Future<void> markOccurrenceAsPaid({
     required String occurrenceId,
     required String? transactionId,
@@ -122,6 +131,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get upcoming due expenses for a user
+  @override
   Future<List<RecurringExpense>> getUpcomingExpenses(String userId) async {
     try {
       final expenses = await getActiveRecurringExpenses(userId);
@@ -138,6 +148,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get expenses due today
+  @override
   Future<List<RecurringExpense>> getDueTodayExpenses(String userId) async {
     try {
       final expenses = await getActiveRecurringExpenses(userId);
@@ -155,6 +166,7 @@ class RecurringExpenseRepository {
   }
 
   /// Pause a recurring expense
+  @override
   Future<void> pauseRecurringExpense(String expenseId) async {
     try {
       final expense = await getRecurringExpense(expenseId);
@@ -170,6 +182,7 @@ class RecurringExpenseRepository {
   }
 
   /// Get total monthly recurring expenses
+  @override
   Future<int> getTotalMonthlyExpenses(String userId) async {
     try {
       final expenses = await getActiveRecurringExpenses(userId);

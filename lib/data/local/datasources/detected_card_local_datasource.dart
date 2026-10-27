@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/detected_card_model.dart';
+import '../../../domain/entities/detected_card_model.dart';
 
 /// Local (SharedPreferences) storage for [DetectedCard].
 ///

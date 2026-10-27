@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import '../models/transaction_model.dart';
-import '../models/user_model.dart';
+import '../../domain/entities/transaction_model.dart';
+import '../../domain/entities/user_model.dart';
 
 /// A lightweight bank identity used for sender/text matching without
 /// depending on database-generated ids (the DB assigns real uuids).
@@ -40,7 +40,14 @@ class BankCatalog {
         code: 'ALEX',
         name: 'AlexBank',
         nameAr: 'بنك الإسكندرية',
-        aliases: ['bank of alexandria', 'alex bank', 'alexbank']),
+        aliases: [
+          'bank of alexandria',
+          'alex bank',
+          'alexbank',
+          'ab magnifica',
+          'ab private',
+          '4988'
+        ]),
     KnownBank(code: 'HSBC', name: 'HSBC Egypt', nameAr: 'بنك HSBC مصر'),
     KnownBank(
         code: 'ADIB',
@@ -74,7 +81,9 @@ class BankCatalog {
     if (text.contains(lowerCode) ||
         text.contains(lowerName) ||
         text.contains(lowerNameAr) ||
-        bank.aliases.any((alias) => text.contains(alias.toLowerCase()))) {
+        bank.aliases.any((alias) => RegExp(r'^\d+$').hasMatch(alias)
+            ? senderLower == alias
+            : text.contains(alias.toLowerCase()))) {
       return true;
     }
     // Sender-only token match: catches senders like "FAISAL BANK" whose
@@ -137,13 +146,14 @@ class ParsedSms {
   final String? transferMethod;
 
   /// Account identifier tail that appears as "رقم …" in the message. For IPN
-  /// received transfers this is the account last 4 (e.g. `7505`); null
+  /// received transfers this is the account last 4 (e.g. `6101`); null
   /// otherwise.
   final String? accountLast4;
 
   /// Source/channel for mobile–internet banking messages — the text between
   /// "/" and "في حسابك" (e.g. `الموبايل والانترنت البنكي`). Null otherwise.
   final String? sourceChannel;
+  final DateTime? transactionDate;
 
   /// Confidence in [0,1]. Values below 0.6 should be reviewed by the user.
   final double confidence;
@@ -168,6 +178,7 @@ class ParsedSms {
     this.transferMethod,
     this.accountLast4,
     this.sourceChannel,
+    this.transactionDate,
     required this.confidence,
     required this.fingerprint,
     required this.needsReview,
@@ -317,7 +328,9 @@ class SMSParser {
       if (name.length >= 6 && text.contains(name)) return bank.name;
       final nameAr = bank.nameAr.toLowerCase();
       if (nameAr.length >= 4 && text.contains(nameAr)) return bank.name;
-      if (bank.aliases.any((alias) => text.contains(alias.toLowerCase()))) {
+      if (bank.aliases.any((alias) =>
+          !RegExp(r'^\d+$').hasMatch(alias) &&
+          text.contains(alias.toLowerCase()))) {
         return bank.name;
       }
     }
@@ -383,9 +396,7 @@ class SMSParser {
     final merchant = _extractMerchant(normalizedBody);
     final cardLast4 = _extractCardLast4(normalizedBody);
     final transferMethod = _extractTransferMethod(normalizedBody);
-    final accountLast4 = type == TransactionType.transfer_in
-        ? _extractAccountLast4(normalizedBody)
-        : null;
+    final accountLast4 = _extractAccountLast4(normalizedBody);
     final sourceChannel = type == TransactionType.transfer_in
         ? _extractSourceChannel(normalizedBody)
         : null;
@@ -401,6 +412,7 @@ class SMSParser {
       transferMethod: transferMethod,
       accountLast4: accountLast4,
       sourceChannel: sourceChannel,
+      transactionDate: extractTransactionDate(normalizedBody),
       confidence: confidence,
       fingerprint: fingerprint,
       needsReview: needsReview,
@@ -489,7 +501,7 @@ class SMSParser {
   /// integrates [extractWholeAmount] as a last-resort fallback for messages
   /// that quote an integer amount without any currency token.
   static int? extractAmount(String sms) {
-    final s = _insertDigitBoundaries(_normalizeDigits(sms));
+    final s = _insertDigitBoundaries(_transactionText(sms));
 
     final patterns = [
       // Egyptian shorthand "جم" (jum = pounds) — e.g. "بمبلغ10.00 جم".
@@ -559,12 +571,15 @@ class SMSParser {
 
   /// Whole-EGP fallback for messages that quote an integer amount.
   static int? extractWholeAmount(String sms) {
-    final s = _normalizeDigits(sms);
-    final match = RegExp(r'\b(\d{2,6})\b').firstMatch(s);
+    final s = _transactionText(sms);
+    final match = RegExp(
+            r'(?:amount|بمبلغ|مبلغ|بقيمة|خصم|إضافة|اضافة)\s*:?\s*(\d+(?:[.,]\d+)*)',
+            caseSensitive: false)
+        .firstMatch(s);
     if (match == null) return null;
-    final value = int.tryParse(match.group(1)!);
+    final value = _parseNumber(match.group(1));
     if (value == null || value <= 0) return null;
-    return value * 100;
+    return (value * 100).round();
   }
 
   /// Detect the transaction currency from the SMS text.
@@ -574,7 +589,7 @@ class SMSParser {
   /// heuristic: Gulf banks (ENBD, FAB, ADIB) typically transact in AED,
   /// otherwise defaults to EGP.
   static String detectCurrency(String sms) {
-    final s = _normalizeDigits(sms).toLowerCase();
+    final s = _transactionText(sms).toLowerCase();
 
     // Explicit currency code/symbol. Order matters — check longer/more
     // specific tokens before shorter ones.
@@ -591,10 +606,6 @@ class SMSParser {
     if (s.contains(r'$')) return 'USD';
     if (s.contains('€')) return 'EUR';
 
-    // Bank-based heuristics for currencies the bank typically uses.
-    if (s.contains('enbd') || s.contains('fab') || s.contains('adib')) {
-      return 'AED';
-    }
     return 'EGP';
   }
 
@@ -609,6 +620,14 @@ class SMSParser {
 
   static ClassificationResult classify(String sms) {
     final s = _normalizeDigits(sms).toLowerCase();
+
+    // Notifications about failed attempts and OTPs never move money.
+    if (RegExp(
+            r'\botp\b|one[ -]time|verification code|رمز التحقق|كود التحقق|لم تتم|غير ناجح|مرفوض|\bdeclined\b|\bfailed\b|\bunsuccessful\b',
+            caseSensitive: false)
+        .hasMatch(s)) {
+      return const ClassificationResult(null, 0);
+    }
 
     // The IPN received-transfer pattern uses "الى" (bare alif) in the wild;
     // normalize it to "إلى" so every downstream "to your account" check also
@@ -683,6 +702,11 @@ class SMSParser {
 
     final direction = d;
 
+    // An ATM can accept deposits as well as dispense cash.
+    if (depositScore >= 1 &&
+        !RegExp(r'withdraw|سحب', caseSensitive: false).hasMatch(s)) {
+      return const ClassificationResult(TransactionType.income, 1);
+    }
     // ATM takes priority — strongly identifiable.
     if (atmScore >= 1) {
       return ClassificationResult(TransactionType.atm_withdrawal, direction);
@@ -703,11 +727,7 @@ class SMSParser {
       if (direction < 0) {
         return ClassificationResult(TransactionType.transfer_out, direction);
       }
-      // Money movement without an explicit direction: wallets/instapay send
-      // out is the default; generic "transfer" stays unknown for review.
-      if (instaPayScore > 0 || walletScore > 0) {
-        return ClassificationResult(TransactionType.transfer_out, direction);
-      }
+      // A provider name alone cannot prove which way money moved.
       return ClassificationResult(null, direction);
     }
 
@@ -723,6 +743,15 @@ class SMSParser {
 
     // Purchases / POS debits.
     if (purchaseScore >= 1) {
+      return const ClassificationResult(TransactionType.purchase, -1);
+    }
+
+    if (RegExp(r'تم\s*(?:إضافة|اضافة|إضافه|اضافه)|added to|credited to',
+            caseSensitive: false)
+        .hasMatch(s)) {
+      return const ClassificationResult(TransactionType.income, 1);
+    }
+    if (s.contains('خصم')) {
       return const ClassificationResult(TransactionType.purchase, -1);
     }
 
@@ -795,7 +824,7 @@ class SMSParser {
   static String _normalizeHamza(String s) => s.replaceAll('الى', 'إلى');
 
   /// Pattern 1 — card purchase:
-  ///   "تمت عملية بمبلغ1200.00 EGPببطاقة2307** في12/09/26-15:40 عند MERCHANT"
+  ///   "تمت عملية بمبلغ1200.00 EGPببطاقة6202** في12/09/26-15:40 عند MERCHANT"
   /// Distinguishing marks: a card token ("بطاقة") AND a merchant marker
   /// ("عند"). Amount/card/merchant are extracted by the existing extractors.
   static bool _isCardPurchasePattern(String s) =>
@@ -832,7 +861,7 @@ class SMSParser {
   ///   "تم إضافة تحويل IPN إلى/الى حسابكم رقم {ACCOUNT} بمبلغ {AMOUNT}"
   /// The transfer is being ADDED TO the user's account → money IN.
   /// `الى` vs `إلى` handled by [_normalizeHamza]. Whitespace between words is
-  /// collapsed so "رقم 7505" / "رقم7505" / "بمبلغ 240" / "بمبلغ240" all match.
+  /// collapsed so "رقم 6101" / "رقم6101" / "بمبلغ 240" / "بمبلغ240" all match.
   static bool _isIpnReceivedTransfer(String s) {
     final t =
         RegExp(r'\s+').hasMatch(s) ? s.replaceAll(RegExp(r'\s+'), ' ') : s;
@@ -872,11 +901,14 @@ class SMSParser {
     return cleaned.isEmpty ? null : cleaned;
   }
 
-  /// Extract the account tail that appears after "رقم" (e.g. `7505`). Returns
+  /// Extract the account tail that appears after "رقم" (e.g. `6101`). Returns
   /// the last 4 digits of the identified number — never a fabricated value.
   static String? _extractAccountLast4(String s) {
     final t = _normalizeHamza(s);
-    final m = RegExp(r'رقم\s*(\d{1,16})').firstMatch(t);
+    final m = RegExp(
+            r'(?:حسابك(?:م)?\s*(?:رقم)?|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*(\d{4,16})(?!\d)',
+            caseSensitive: false)
+        .firstMatch(t);
     if (m == null) return null;
     final digits = m.group(1)!.replaceAll(RegExp(r'\D'), '');
     if (digits.isEmpty) return null;
@@ -980,6 +1012,10 @@ class SMSParser {
     'you got',
     'in favour',
     'استقبل',
+    'استلمت',
+    'تم استلام',
+    'تم إضافة',
+    'تم اضافة',
     'استلام',
     'وارد',
     'دائن',
@@ -1007,6 +1043,8 @@ class SMSParser {
     'صادر',
     'مدين',
     'أرسلت',
+    'ارسلت',
+    'قمت بتحويل',
     'حوالة صادرة',
     'من حسابكم',
     'خصم من',
@@ -1036,6 +1074,58 @@ class SMSParser {
   ];
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /// The balance is a separate quantity, never the transaction amount.
+  static String _transactionText(String sms) => _normalizeDigits(sms)
+      .split(
+        RegExp(
+            r'رصيدك|الرصيد|المتاح\s*(?:الان|الآن)|available\s*(?:balance|credit)|\bbalance\b',
+            caseSensitive: false),
+      )
+      .first;
+
+  /// A bank account token is distinct from a card number. Preserve masks:
+  /// `0000*****000` exposes three trailing digits, never invent a fourth.
+  static String? accountToken(String sms) {
+    final s = _normalizeDigits(sms).replaceAll(RegExp(r'\s+'), ' ');
+    final match = RegExp(
+            r'(?:حسابك(?:م)?\s*(?:رقم)?|(?:من|إلى|الى)\s+ح\s*|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*([\d*Xx]{4,24})(?!\d)',
+            caseSensitive: false)
+        .firstMatch(s);
+    return match?.group(1)?.toUpperCase();
+  }
+
+  static DateTime? extractTransactionDate(String sms) {
+    final s = _normalizeDigits(sms);
+    final match = RegExp(
+            r'(\d{1,2})[/\.](\d{1,2})[/\.](\d{2,4})\s*(?:-|في|فى|الساعة)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?',
+            caseSensitive: false)
+        .firstMatch(s);
+    if (match == null) return null;
+    var day = int.parse(match[1]!);
+    var month = int.parse(match[2]!);
+    // Egyptian day/month unless impossible, as in the bank's 10/13/26.
+    if (month > 12 && day <= 12) {
+      final swap = day;
+      day = month;
+      month = swap;
+    }
+    var year = int.parse(match[3]!);
+    if (year < 100) year += 2000;
+    var hour = int.parse(match[4]!);
+    final minute = int.parse(match[5]!);
+    final second = int.parse(match[6] ?? '0');
+    final period = match[7]?.toUpperCase();
+    if (period != null) {
+      if (hour < 1 || hour > 12) return null;
+      hour = hour % 12 + (period == 'PM' ? 12 : 0);
+    }
+    if (hour > 23 || minute > 59 || second > 59) return null;
+    final result = DateTime(year, month, day, hour, minute, second);
+    return result.year == year && result.month == month && result.day == day
+        ? result
+        : null;
+  }
 
   /// Insert a space between Arabic-script letters and ASCII digits so
   /// attached forms like "بمبلغ10.00" tokenize as "بمبلغ 10.00".
@@ -1083,8 +1173,8 @@ class SMSParser {
     // Egyptian bank SMS expose the card's LAST FOUR digits in EITHER mask
     // layout, and both are genuine last-four values:
     //
-    //     **2325   /   ****1234   /   XX4321        (mask leads the digits)
-    //     بطاقة2307**   /   بطاقة 2307**            (digits lead the mask)
+    //     **6303   /   ****1234   /   XX4321        (mask leads the digits)
+    //     بطاقة6202**   /   بطاقة 6202**            (digits lead the mask)
     //
     // The trailing `**` is a formatting/alignment artifact of how this bank
     // renders the card, NOT a statement that the visible digits are the card's
@@ -1127,7 +1217,7 @@ class SMSParser {
     for (final pattern in labeledPatterns) {
       final match = pattern.firstMatch(s);
       if (match == null) continue;
-      // A trailing mask after the digits (`بطاقة2307**`) is a formatting
+      // A trailing mask after the digits (`بطاقة6202**`) is a formatting
       // artifact of this bank's card rendering, NOT a statement that these are
       // the card's first four. The digits a `بطاقة` label introduces ARE the
       // card's last four in both mask layouts, so the value is returned either

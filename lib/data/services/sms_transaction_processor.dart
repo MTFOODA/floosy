@@ -1,9 +1,9 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:uuid/uuid.dart';
-import '../models/transaction_model.dart';
-import '../models/user_model.dart';
-import '../models/detected_card_model.dart';
+import '../../domain/entities/transaction_model.dart';
+import '../../domain/entities/user_model.dart';
+import '../../domain/entities/detected_card_model.dart';
 import '../repositories/detected_card_repository.dart';
 import '../repositories/money_repository.dart';
 import '../local/datasources/processed_sms_local_datasource.dart';
@@ -11,6 +11,7 @@ import '../local/datasources/sms_message_local_datasource.dart';
 import '../remote/datasources/sms_remote_datasource.dart';
 import 'bank_sender_mapping_store.dart';
 import 'sms_parser_service.dart';
+import 'egp_exchange_service.dart';
 import '../../core/utils/app_logger.dart';
 
 /// Orchestrates the SMS pipeline:
@@ -28,6 +29,8 @@ import '../../core/utils/app_logger.dart';
 /// relationship auditing are possible. Logging still uses only sanitized data.
 
 class SMSTransactionProcessor {
+  final EgpExchangeService? exchangeService;
+
   /// Remote sms_messages calls (dedupe check, metadata insert, link) are
   /// bounded so an offline/hung network can never stall a scan. Injectable
   /// for tests.
@@ -43,6 +46,7 @@ class SMSTransactionProcessor {
   final _uuid = const Uuid();
 
   SMSTransactionProcessor({
+    this.exchangeService,
     required this.moneyRepository,
     this.detectedCardRepository,
     this.smsRemoteDataSource,
@@ -253,9 +257,20 @@ class SMSTransactionProcessor {
       }
     }
 
+    if (parsed.cardLast4 == null) {
+      detectedCard = await moneyRepository.findLearnedSmsCard(
+        userId: userId,
+        sender: sender,
+        body: smsContent,
+        bankName: bankName,
+        type: parsed.type,
+      );
+    }
+
     if (parsed.amountMinor == null) {
       logWarning('TRANSACTION_SKIPPED hash=$messageHash reason=amount');
-      await _updateDetectionStatus(localDetection, remoteDetectionRecord, 'needs_review');
+      await _updateDetectionStatus(
+          localDetection, remoteDetectionRecord, 'needs_review');
       return false;
     }
 
@@ -270,14 +285,15 @@ class SMSTransactionProcessor {
     }
     if (type == null) {
       logWarning('TRANSACTION_SKIPPED hash=$messageHash reason=type');
-      await _updateDetectionStatus(localDetection, remoteDetectionRecord, 'needs_review');
+      await _updateDetectionStatus(
+          localDetection, remoteDetectionRecord, 'needs_review');
       return false;
     }
 
     logInfo('SMS_TYPE_IDENTIFIED: ${type.name}');
     logInfo('SMS_AMOUNT_IDENTIFIED: ${parsed.amountMinor}');
     logInfo('SMS_CURRENCY_IDENTIFIED: ${parsed.currency}');
-      logInfo('SMS_CARD_LAST4_IDENTIFIED present=${parsed.cardLast4 != null}');
+    logInfo('SMS_CARD_LAST4_IDENTIFIED present=${parsed.cardLast4 != null}');
 
     // Resolve the user's bank account (multi-bank). A missing account is
     // allowed: the transaction still remains visible and can be linked later.
@@ -289,23 +305,46 @@ class SMSTransactionProcessor {
       logError('SMS_ACCOUNT_LOOKUP_TIMEOUT proceeding without account', e);
     }
 
+    final transactionDate =
+        parsed.transactionDate ?? receivedAt ?? DateTime.now();
+    var amountMinor = parsed.amountMinor!;
+    var currency = parsed.currency;
+    var status = TransactionStatus.confirmed;
+    String? notes;
+    if (currency != 'EGP' && exchangeService != null) {
+      final converted = await exchangeService!
+          .convert(amountMinor, currency, transactionDate);
+      if (converted == null) {
+        status = TransactionStatus.pending;
+        notes =
+            'FX unavailable: review the original $currency amount, enter the EGP amount and save to confirm.';
+      } else {
+        notes =
+            'FX estimate: ${(amountMinor / 100).toStringAsFixed(2)} $currency; '
+            '1 $currency = ${converted.rate} EGP; ${converted.rateDate}; Frankfurter. '
+            'Bank fees may differ.';
+        amountMinor = converted.amountMinor;
+        currency = 'EGP';
+      }
+    }
     final transaction = Transaction(
       id: _uuid.v4(),
       userId: userId,
       bankId: bankId,
       type: type,
       source: TransactionSource.sms,
-      amountMinor: parsed.amountMinor!,
-      currency: parsed.currency,
-      transactionDate: receivedAt ?? DateTime.now(),
+      amountMinor: amountMinor,
+      currency: currency,
+      transactionDate: transactionDate,
+      notes: notes,
       merchantName: parsed.merchant ?? bankName,
-      cardLast4: parsed.cardLast4,
+      cardLast4: parsed.cardLast4 ?? detectedCard?.last4,
       // Stamped at creation time. Null when the SMS carried no card number or
       // the card could not be resolved -> the row stays unassigned (red dot).
       cardId: detectedCard?.id,
       rawReference: messageHash,
       fingerprint: parsed.fingerprint,
-      status: TransactionStatus.confirmed,
+      status: status,
     );
 
     final recorded = await moneyRepository.recordSmsTransaction(
@@ -317,7 +356,8 @@ class SMSTransactionProcessor {
     // The remote detection row is already persisted. Set its final state and
     // relationship only after the authoritative money-ledger write succeeds.
     if (recorded) {
-      await _completeDetection(localDetection, remoteDetectionRecord, transaction.id);
+      await _completeDetection(
+          localDetection, remoteDetectionRecord, transaction.id);
       logInfo('TRANSACTION_CREATED id=${transaction.id} source=sms');
     } else {
       logInfo('TRANSACTION_SKIPPED id=${transaction.id} reason=duplicate');
@@ -413,7 +453,8 @@ class SMSTransactionProcessor {
     String status,
   ) async {
     try {
-      await smsMessageLocalDataSource?.upsert(localRecord.copyWith(processingStatus: status));
+      await smsMessageLocalDataSource
+          ?.upsert(localRecord.copyWith(processingStatus: status));
     } catch (e) {
       logError('SMS_LOCAL_DETECTION_STATUS_UPDATE_FAILED status=$status', e);
     }
@@ -481,7 +522,6 @@ class SMSTransactionProcessor {
       return 0;
     }
   }
-
 
   /// Human-friendly display bank name for a validated wallet/sender
   /// identifier (requirement #2). Recognized wallet identifiers are not in

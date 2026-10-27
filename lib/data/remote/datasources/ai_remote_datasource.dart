@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/ai_model.dart';
+import '../../../domain/entities/ai_model.dart';
 
 class AIRemoteDataSource {
   final SupabaseClient _supabaseClient;

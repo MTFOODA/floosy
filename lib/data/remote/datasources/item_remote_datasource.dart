@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/item_model.dart';
+import '../../../domain/entities/item_model.dart';
 
 /// Remote data source for items, categories, merchants, cash wallets and
 /// cash movements (all live in [item_model.dart] domain models).

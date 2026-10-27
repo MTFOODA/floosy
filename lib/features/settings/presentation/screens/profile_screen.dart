@@ -1,29 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/settings/presentation/cubit/profile_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/app_logger.dart';
-import '../../../../data/models/user_model.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../domain/entities/user_model.dart';
+import '../../../../routing/app_routes.dart';
 
 /// Profile screen — the user can edit name/phone; the email is ALWAYS
 /// read-only because it is owned by Supabase Auth (auth.users).
-class ProfileScreen extends ConsumerStatefulWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _emailController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  bool _isLoading = false;
+  bool get _isLoading => context.read<ProfileCubit>().state.isLoading;
   bool _initialized = false;
 
   @override
   void dispose() {
+    _emailController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -37,20 +40,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _save() async {
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
     final l = AppLocalizations.s(context);
 
-    setState(() => _isLoading = true);
+    final cubit = context.read<ProfileCubit>();
     try {
-      final current =
-          await ref.read(profileRepositoryProvider).getProfile(userId);
-      final updated = (current ?? UserProfile(id: userId)).copyWith(
-        fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-      );
-      await ref.read(profileRepositoryProvider).updateProfile(updated);
-      ref.invalidate(userProfileProvider);
+      await cubit.save(
+          userId: userId,
+          name: _nameController.text,
+          phone: _phoneController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l['profileUpdated'])),
@@ -61,23 +60,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l['error']),
+            content: Text(l['profileSaveFailed']),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final profileAsync = ref.watch(userProfileProvider);
-    final authEmail = ref.watch(currentUserProvider)?.email ?? '';
+    final profileAsync = context.watch<ProfileCubit>().state;
+    final authEmail = context.watch<AuthCubit>().state.user?.email ?? '';
 
-    _initFromProfile(profileAsync.value);
+    if (profileAsync.hasValue && !profileAsync.isLoading) {
+      _initFromProfile(profileAsync.value);
+    }
+    if (_emailController.text != authEmail) {
+      _emailController.text = authEmail;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -99,7 +101,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             // Email — read-only, from the authenticated session.
             TextField(
               enabled: false,
-              controller: TextEditingController(text: authEmail),
+              controller: _emailController,
               decoration: InputDecoration(
                 labelText: l['emailReadOnly'],
                 prefixIcon: const Icon(Icons.alternate_email),

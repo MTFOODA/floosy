@@ -1,15 +1,18 @@
-﻿import 'package:uuid/uuid.dart';
-import '../models/item_model.dart' as items;
-import '../models/item_model.dart' show CashWallet, CashMovement;
-import '../models/detected_card_model.dart';
+import '../../domain/repositories/money_repository.dart' as domain;
+import 'dart:async';
+import 'package:uuid/uuid.dart';
+import '../../domain/entities/item_model.dart' as items;
+import '../../domain/entities/item_model.dart' show CashWallet, CashMovement;
+import '../../domain/entities/detected_card_model.dart';
 import 'detected_card_repository.dart';
-import '../models/money_model.dart';
-import '../models/transaction_model.dart';
+import '../../domain/entities/money_model.dart';
+import '../../domain/entities/transaction_model.dart';
 import '../local/datasources/money_local_datasource.dart';
 import '../local/datasources/sms_message_local_datasource.dart';
 import '../remote/datasources/money_remote_datasource.dart';
-import '../services/card_balance_calculator.dart';
-import '../services/card_ownership.dart';
+import '../../domain/services/card_balance_calculator.dart';
+import '../../domain/services/card_ownership.dart';
+import '../services/sms_card_identity.dart';
 import '../services/smart_card_resolution_service.dart';
 import '../../core/utils/app_logger.dart';
 import 'transaction_repository.dart';
@@ -17,7 +20,7 @@ import 'cash_wallet_repository.dart';
 import 'expense_repository.dart';
 
 /// Balances carry forward; only spending totals are month-scoped.
-class MoneyRepository {
+class MoneyRepository implements domain.MoneyRepository {
   final MoneyRemoteDataSource remote;
   final MoneyLocalDataSource local;
   final TransactionRepository transactionRepository;
@@ -38,10 +41,12 @@ class MoneyRepository {
       this.smsMessageLocalDataSource,
       this.remoteCardIdWriter});
 
+  @override
   Future<List<MonthlyIncome>> getMonthlyIncomes(String userId,
           {int? year, int? month}) =>
       local.getMonthlyIncomes(userId, year: year, month: month);
 
+  @override
   Future<void> addMonthlyIncome(
       {required String userId,
       required int year,
@@ -58,6 +63,167 @@ class MoneyRepository {
         amountMinor: amountMinor));
   }
 
+  /// A home-screen item spends cash already withdrawn from this card.
+  /// Its transaction, cash movement, expense and usage commit together.
+  @override
+  Future<bool> purchaseItemWithCash({
+    required String userId,
+    required items.Item item,
+    required String cardLast4,
+    String? bankName,
+    String? purchaseId,
+  }) async {
+    if (item.userId != userId || !item.isActive || item.isArchived) {
+      throw ArgumentError('Item is not available to this user');
+    }
+    if (item.priceMinor <= 0 || item.currency != 'EGP') {
+      throw ArgumentError('A positive EGP price is required');
+    }
+    final card = await _findCardByLast4(userId, cardLast4, bankName: bankName);
+    if (card == null) throw StateError('Select an unambiguous card');
+    final expenseLocal = expenseRepository.localDataSource;
+    if (expenseLocal == null) {
+      throw StateError('Local expense storage is required');
+    }
+    final id = purchaseId ?? _uuid.v4();
+    final date = DateTime.now().toUtc();
+    final transaction = Transaction(
+      id: id,
+      userId: userId,
+      type: TransactionType.cash_expense,
+      source: TransactionSource.manual,
+      amountMinor: item.priceMinor,
+      currency: item.currency,
+      categoryId: item.categoryId,
+      cardId: card.id,
+      cardLast4: card.last4,
+      transactionDate: date,
+      fingerprint: 'item-cash-$id',
+      merchantName: item.nameAr ?? item.name,
+      notes: item.name,
+    );
+    final expense = Expense(
+        id: _uuid.v4(),
+        userId: userId,
+        transactionId: id,
+        categoryId: item.categoryId,
+        amountMinor: item.priceMinor,
+        currency: item.currency,
+        expenseDate: date,
+        paymentMethod: PaymentMethod.cash,
+        notes: item.name);
+    final line = ExpenseItem(
+        id: _uuid.v4(),
+        expenseId: expense.id,
+        itemId: item.id,
+        quantity: 1,
+        unitPriceMinor: item.priceMinor,
+        totalPriceMinor: item.priceMinor);
+    final usage = ItemUsage(
+        id: _uuid.v4(),
+        userId: userId,
+        itemId: item.id,
+        expenseId: expense.id,
+        quantity: 1,
+        totalAmountMinor: item.priceMinor,
+        usageDate: date);
+    var recorded = false;
+    await local.runInTransaction(() async {
+      if (await transactionRepository.isDuplicateTransaction(
+          userId: userId, fingerprint: transaction.fingerprint)) {
+        return;
+      }
+      final available =
+          await getPocketCashForCard(userId, cardLast4, bankName: bankName);
+      if (available < item.priceMinor) {
+        throw InsufficientPocketCashException(
+            requiredMinor: item.priceMinor, availableMinor: available);
+      }
+      var wallet = await local.getWallet(userId);
+      if (wallet == null) {
+        wallet =
+            CashWallet(id: _uuid.v4(), userId: userId, currency: item.currency);
+        await local.insertWallet(wallet);
+      }
+      await transactionRepository.insertLocally(transaction);
+      await expenseLocal.insertExpense(expense);
+      await expenseLocal.insertExpenseItem(line);
+      await local.insertItemUsage(usage);
+      await local.insertCashMovement(CashMovement(
+          id: 'cash-$id',
+          userId: userId,
+          walletId: wallet.id,
+          type: 'cash_expense',
+          amountMinor: item.priceMinor,
+          referenceType: 'transaction',
+          referenceId: id,
+          description: item.name,
+          movementDate: date));
+      await local.queueItemCashSync(userId, transaction.id);
+      recorded = true;
+    });
+    if (recorded) {
+      unawaited(_mirrorCashItemPurchase(transaction, expense, line, usage));
+    }
+    return recorded;
+  }
+
+  Future<void> _mirrorCashItemPurchase(Transaction transaction, Expense expense,
+      ExpenseItem line, ItemUsage usage) async {
+    if (!await transactionRepository.mirrorCreatedTransaction(transaction)) {
+      return;
+    }
+    try {
+      await expenseRepository.remoteDataSource
+          .createExpense(expense)
+          .timeout(const Duration(seconds: 15));
+      await expenseRepository.remoteDataSource
+          .createExpenseItem(line)
+          .timeout(const Duration(seconds: 15));
+      await expenseRepository
+          .recordItemUsages([usage]).timeout(const Duration(seconds: 15));
+      await cashWalletRepository
+          .ensureExpenseMovement(transaction)
+          .timeout(const Duration(seconds: 15));
+      await local.markItemCashSynced(transaction.userId, transaction.id);
+      logInfo('ITEM_CASH_REMOTE_SYNC_SUCCESS id=${transaction.id}');
+    } catch (e) {
+      logError('ITEM_CASH_REMOTE_SYNC_FAILED id=${transaction.id}', e);
+    }
+  }
+
+  /// Repairs a missing remote cash movement without buying the item again.
+  /// Only this cash-purchase flow is considered; legacy/manual rows stay owned
+  /// by their original workflows. At most one bounded pending page per launch.
+  @override
+  Future<void> retryItemCashMovements(String userId) async {
+    final rows = {for (final t in await _transactions(userId)) t.id: t};
+    for (final t in rows.values.where((t) =>
+        t.type == TransactionType.cash_expense &&
+        t.fingerprint.startsWith('item-cash-'))) {
+      await local.queueItemCashSync(userId, t.id);
+    }
+    for (final id in await local.pendingItemCashSync(userId)) {
+      final t = rows[id];
+      if (t == null ||
+          t.type != TransactionType.cash_expense ||
+          t.status != TransactionStatus.confirmed) {
+        await local.markItemCashSynced(userId, id);
+        continue;
+      }
+      try {
+        await cashWalletRepository
+            .ensureExpenseMovement(t)
+            .timeout(const Duration(seconds: 15));
+        await local.markItemCashSynced(userId, id);
+        logInfo('ITEM_CASH_MOVEMENT_SYNC_SUCCESS id=$id');
+      } catch (e) {
+        logError('ITEM_CASH_MOVEMENT_SYNC_PENDING id=$id', e);
+      }
+    }
+  }
+
+  @override
   Future<void> purchaseItemWithCard(
       {required String userId,
       required items.Item item,
@@ -68,8 +234,7 @@ class MoneyRepository {
     // `card_id` at creation time instead of relying on the SMS pipeline's
     // asynchronous backfill. A purchase made against a specific card must be
     // attributable to exactly that card.
-    final card =
-        await _findCardByLast4(userId, cardLast4, bankName: bankName);
+    final card = await _findCardByLast4(userId, cardLast4, bankName: bankName);
     final id = _uuid.v4();
     // The purchase is recorded as a transaction whose outgoing delta reduces
     // My Balance (getMyBalanceForCard = currentBalanceMinor + Î£ deltas), for
@@ -113,6 +278,7 @@ class MoneyRepository {
   /// Debit/bank cards keep the existing unrestricted behaviour (requirement
   /// #9): the amount is added to the card's ledger with no credit-limit
   /// checks.
+  @override
   Future<void> addBalanceManually({
     required String userId,
     required String cardLast4,
@@ -190,8 +356,7 @@ class MoneyRepository {
     final matches = cards
         .where((c) =>
             c.last4 == cardLast4 &&
-            (wantBank == null ||
-                normalizeBankIdentity(c.bankName) == wantBank))
+            (wantBank == null || normalizeBankIdentity(c.bankName) == wantBank))
         .toList();
     if (matches.length != 1) return null;
     return matches.single;
@@ -205,6 +370,7 @@ class MoneyRepository {
   /// The full per-card figure set for one card. This is the one place My
   /// Balance / Deducted Money / Pocket Cash are produced, so all three can
   /// never drift apart or be read from different filters.
+  @override
   Future<CardBalance> getCardBalance(
     String userId,
     String cardLast4, {
@@ -242,6 +408,7 @@ class MoneyRepository {
   ///
   /// Judged on the FULL `bank + last4` identity, using the same rule as the
   /// balances, so the dot can never disagree with the figures.
+  @override
   Future<List<Transaction>> getUnassignedTransactions(String userId) async {
     final rows = await _transactions(userId);
     final cards = await _allCards(userId);
@@ -254,6 +421,7 @@ class MoneyRepository {
   }
 
   /// Transactions belonging to exactly one card, used by the card screen.
+  @override
   Future<List<Transaction>> getTransactionsForCard(
     String userId,
     String cardLast4, {
@@ -265,6 +433,7 @@ class MoneyRepository {
     final allCards = await _allCards(userId);
     return CardOwnership.forCard(rows, card, allCards);
   }
+
   /// Detected bank name per transaction id, from the SMS detection record.
   ///
   /// `transactions` stores a bank UUID while `detected_cards` stores a bank NAME,
@@ -286,7 +455,9 @@ class MoneyRepository {
   ///
   /// One instance per repository so every caller (manual Last 4 entry, the
   /// transactions screen, the legacy backfill) shares exactly the same rules.
-  SmartCardResolutionService get smartCardResolver => SmartCardResolutionService(
+  SmartCardResolutionService get smartCardResolver =>
+      SmartCardResolutionService(
+        filterSmsSiblings: _filterSmsSiblings,
         cards: _allCards,
         transactions: _transactions,
         bankNames: _bankNamesByTransaction,
@@ -350,6 +521,34 @@ class MoneyRepository {
         assignRemote: remoteCardIdWriter,
       );
 
+  Future<List<String>> _filterSmsSiblings(
+      String userId, String transactionId, List<String> candidates) async {
+    final store = smsMessageLocalDataSource;
+    if (store == null) return candidates;
+    final messages = {
+      for (final s in await store.linkedMessages(userId)) s.transactionId: s
+    };
+    final source = messages[transactionId];
+    // Legacy records without SMS bodies retain the existing bank/type rule.
+    if (source?.messageBody == null) return candidates;
+    final rows = {for (final t in await _transactions(userId)) t.id: t};
+    String? key(SMSMessage? sms) => sms?.messageBody == null
+        ? null
+        : smsCardIdentityKey(
+            sender: sms!.sender,
+            body: sms.messageBody!,
+            bankName: sms.detectedBankName,
+            type: rows[sms.transactionId]?.type);
+    final sourceKey = key(source);
+    if (sourceKey == null) return [];
+    return candidates
+        .where((id) =>
+            key(messages[id]) == sourceKey &&
+            (rows[id]?.cardId == null ||
+                rows[id]?.cardId == rows[transactionId]?.cardId))
+        .toList();
+  }
+
   /// LEARNS a persistent `Bank + Last 4 -> Card` identity from the user's
   /// explicit confirmation on a transaction, then resolves the edited row and
   /// every transaction that provably shares that exact identity.
@@ -357,23 +556,31 @@ class MoneyRepository {
   /// The bank is read from the transaction itself; the caller only supplies the
   /// Last 4 the user typed. See
   /// [SmartCardResolutionService.learnCardIdentityFromUserConfirmation].
+  @override
   Future<SmartResolutionResult> learnCardIdentity({
     required String userId,
     required String transactionId,
     required String? last4,
     String? bankIdentityOverride,
-  }) =>
-      smartCardResolver.learnCardIdentityFromUserConfirmation(
-        userId: userId,
-        transactionId: transactionId,
-        last4: last4,
-        bankIdentityOverride: bankIdentityOverride,
-      );
+  }) async {
+    if (bankIdentityOverride != null &&
+        bankIdentityOverride.trim().isNotEmpty) {
+      await smsMessageLocalDataSource?.setDetectedBank(
+          userId, transactionId, bankIdentityOverride.trim());
+    }
+    return smartCardResolver.learnCardIdentityFromUserConfirmation(
+      userId: userId,
+      transactionId: transactionId,
+      last4: last4,
+      bankIdentityOverride: bankIdentityOverride,
+    );
+  }
 
   /// The learned card identity for `user + bank + last4`, or null.
   ///
   /// The read path used by SMS ingestion so a future message is routed at
   /// creation time instead of waiting for the user to fix it manually.
+  @override
   Future<DetectedCard?> findLearnedCardIdentity({
     required String userId,
     required String last4,
@@ -390,18 +597,57 @@ class MoneyRepository {
     );
   }
 
+  /// Reuses committed SMS-to-card links, surviving restarts. Conflicting
+  /// confirmations are ambiguous and never choose an arbitrary card.
+  @override
+  Future<DetectedCard?> findLearnedSmsCard(
+      {required String userId,
+      required String? sender,
+      required String body,
+      required String? bankName,
+      required TransactionType? type}) async {
+    final store = smsMessageLocalDataSource;
+    if (store == null || detectedCardRepository == null) return null;
+    final key = smsCardIdentityKey(
+        sender: sender, body: body, bankName: bankName, type: type);
+    if (key == null) return null;
+    final rows = {for (final t in await _transactions(userId)) t.id: t};
+    final ids = <String>{};
+    for (final sms in await store.linkedMessages(userId)) {
+      final t = rows[sms.transactionId];
+      if (t?.cardId == null || sms.messageBody == null) continue;
+      if (smsCardIdentityKey(
+              sender: sms.sender,
+              body: sms.messageBody!,
+              bankName: sms.detectedBankName,
+              type: t!.type) ==
+          key) {
+        ids.add(t.cardId!);
+      }
+    }
+    if (ids.length != 1) return null;
+    final candidates = (await detectedCardRepository!.getCards(userId)).where(
+        (c) =>
+            ids.contains(c.id) &&
+            normalizeBankIdentity(c.bankName) ==
+                normalizeBankIdentity(bankName));
+    return candidates.length == 1 ? candidates.single : null;
+  }
+
   /// Resolves the card identity for a user-supplied Last 4 WITHOUT writing.
+  @override
   Future<CardOwnershipResolution> previewCardIdentity({
     required String userId,
     String? last4,
     String? bankIdentity,
   }) =>
-      smartCardResolver
-          .preview(userId: userId, last4: last4, bankIdentity: bankIdentity);
+      smartCardResolver.preview(
+          userId: userId, last4: last4, bankIdentity: bankIdentity);
 
   /// Applies a user-confirmed Card Last 4 to [transactionId], propagating to
   /// other unresolved transactions ONLY when their identity is provably the
   /// same. See [SmartCardResolutionService] for the full safety contract.
+  @override
   Future<SmartResolutionResult> resolveCardIdentityForUserInput({
     required String userId,
     required String transactionId,
@@ -417,12 +663,14 @@ class MoneyRepository {
 
   /// Re-runs deterministic resolution across every unresolved transaction.
   /// Idempotent: a second call is a no-op.
+  @override
   Future<int> backfillCardIdentities(String userId) =>
       smartCardResolver.backfill(userId: userId);
 
   /// Returns the fixed amount (credit limit) for a card.
   /// For credit cards this is creditLimitMinor. For debit cards this is 0
   /// (no fixed limit â€” balance is derived from transactions).
+  @override
   Future<int> getFixedAmountForCard(
     String userId,
     String cardLast4, {
@@ -445,6 +693,7 @@ class MoneyRepository {
   /// instead of recomputing the rule, and [addBalanceManually] enforces the
   /// very same ceiling, so the invariant `My Balance <= Fixed Amount` cannot be
   /// bypassed from any screen.
+  @override
   Future<int?> getMaxAddableForCard(
     String userId,
     String cardLast4, {
@@ -461,6 +710,7 @@ class MoneyRepository {
 
   /// True when this card may be topped up through "+". A credit card with no
   /// Fixed Amount reports false so the UI can disable the button outright.
+  @override
   Future<bool> canAddBalanceForCard(
     String userId,
     String cardLast4, {
@@ -491,6 +741,7 @@ class MoneyRepository {
   /// carried forever and drifted out of sync with the ledger - which is exactly
   /// why changing the Fixed Amount did not update My Balance. Deriving instead
   /// of caching removes that whole class of stale-data bug.
+  @override
   Future<void> setFixedAmountForCard({
     required String userId,
     required String cardLast4,
@@ -526,6 +777,7 @@ class MoneyRepository {
 
   int _balanceDelta(Transaction t) => CardBalance.balanceDelta(t);
 
+  @override
   Future<int> getMyBalanceForCard(
     String userId,
     String cardLast4, {
@@ -537,6 +789,7 @@ class MoneyRepository {
   /// Deducted Money for one card: purchases + outgoing transfers + cash
   /// expenses, computed from that card's OWN rows. ATM withdrawals are
   /// excluded â€” they are Pocket Cash, not Deducted Money.
+  @override
   Future<int> getDeductedMoneyForCard(
     String userId,
     String cardLast4, {
@@ -556,6 +809,7 @@ class MoneyRepository {
   ///
   /// Keyed strictly by [cardLast4], never by the currently selected card.
   /// Historical transaction rows are preserved regardless of the setting.
+  @override
   Future<bool> isPocketCashVisibleForCard(
     String userId,
     String cardLast4, {
@@ -566,6 +820,7 @@ class MoneyRepository {
     return card.cashWithdrawalEnabled;
   }
 
+  @override
   Future<int> getPocketCashForCard(
     String userId,
     String cardLast4, {
@@ -583,11 +838,14 @@ class MoneyRepository {
         .pocketCashMinor;
   }
 
+  @override
   Future<List<UserBankAccount>> getBankAccounts(String userId) =>
       local.getBankAccounts(userId);
+  @override
   Future<int> getMonthlyIncomeSum(String userId, int year, int month) =>
       local.getMonthlyIncomeSum(userId, year, month);
 
+  @override
   Future<MoneySummary> getMoneySummary(String userId) async {
     final now = DateTime.now();
     final rows = await _transactions(userId);
@@ -614,6 +872,7 @@ class MoneyRepository {
             await getMonthlyIncomeSum(userId, now.year, now.month));
   }
 
+  @override
   Future<bool> recordSmsTransaction(
       {required String userId,
       required Transaction transaction,

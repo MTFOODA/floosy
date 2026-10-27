@@ -96,4 +96,12 @@ Thumbs.db
 
 # Real device database pulls (contains real financial PII) - never commit
 .diag/
+
+# Local Google OAuth credentials (the secret belongs in Supabase only).
+/google/
 test/fixtures/device_floosy.db*
+
+# Personal bank SMS notes and the local regression tests that use them.
+/sms.txt
+/test/fixtures/bank_sms_samples.json
+/test/sms_request_regression_test.dart

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/core/localization/preferences_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../routing/app_routes.dart';
 
 /// Language picker — strictly one language (Arabic or English), persisted.
-void showLanguageDialog(
-    BuildContext context, WidgetRef ref, AppLocalizations l) {
-  final current = ref.read(localeNotifierProvider);
+void showLanguageDialog(BuildContext context, AppLocalizations l) {
+  final current = context.read<LocaleCubit>().state;
   showDialog(
     context: context,
     builder: (dialogContext) => SimpleDialog(
@@ -17,9 +17,7 @@ void showLanguageDialog(
         RadioGroup<String>(
           groupValue: current.languageCode,
           onChanged: (code) {
-            ref
-                .read(localeNotifierProvider.notifier)
-                .setLocale(Locale(code ?? 'en'));
+            context.read<LocaleCubit>().setLocale(Locale(code ?? 'en'));
             Navigator.pop(dialogContext);
           },
           child: const Column(
@@ -42,8 +40,8 @@ void showLanguageDialog(
 
 /// Logout confirmation that actually calls supabase.auth.signOut().
 /// The router redirect returns the user to Login when the session clears.
-Future<void> confirmLogout(
-    BuildContext context, WidgetRef ref, AppLocalizations l) async {
+Future<void> confirmLogout(BuildContext context, AppLocalizations l) async {
+  final auth = context.read<AuthCubit>();
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -63,7 +61,7 @@ Future<void> confirmLogout(
   );
   if (confirmed != true) return;
 
-  await ref.read(authRepositoryProvider).signOut();
+  await auth.signOut();
   if (context.mounted) {
     context.go(AppRoutes.login);
   }

@@ -1,14 +1,18 @@
-import '../models/analytics_model.dart';
-import '../models/budget_model.dart';
+import '../../domain/entities/spending_comparison.dart';
+export '../../domain/entities/spending_comparison.dart';
+import '../../domain/repositories/analytics_repository.dart' as domain;
+import '../../domain/entities/analytics_model.dart';
+import '../../domain/entities/budget_model.dart';
 import '../remote/datasources/analytics_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class AnalyticsRepository {
+class AnalyticsRepository implements domain.AnalyticsRepository {
   final AnalyticsRemoteDataSource remoteDataSource;
 
   AnalyticsRepository({required this.remoteDataSource});
 
   /// Get monthly report for a user
+  @override
   Future<MonthlyReport?> getMonthlyReport({
     required String userId,
     required int year,
@@ -27,6 +31,7 @@ class AnalyticsRepository {
   }
 
   /// Get all monthly reports for a user
+  @override
   Future<List<MonthlyReport>> getMonthlyReports(String userId) async {
     try {
       return await remoteDataSource.getMonthlyReports(userId);
@@ -37,6 +42,7 @@ class AnalyticsRepository {
   }
 
   /// Get item statistics for a month
+  @override
   Future<List<MonthlyItemStatistic>> getItemStatistics({
     required String userId,
     required int year,
@@ -55,6 +61,7 @@ class AnalyticsRepository {
   }
 
   /// Get top spending items for a month
+  @override
   Future<List<MonthlyItemStatistic>> getTopItems({
     required String userId,
     required int year,
@@ -77,6 +84,7 @@ class AnalyticsRepository {
   }
 
   /// Get saving recommendations for a user
+  @override
   Future<List<SavingRecommendation>> getSavingRecommendations(
       String userId) async {
     try {
@@ -88,6 +96,7 @@ class AnalyticsRepository {
   }
 
   /// Get saving goals for a user
+  @override
   Future<List<SavingGoal>> getSavingGoals(String userId) async {
     try {
       return await remoteDataSource.getSavingGoals(userId);
@@ -98,6 +107,7 @@ class AnalyticsRepository {
   }
 
   /// Create a new saving goal
+  @override
   Future<SavingGoal> createSavingGoal({
     required String userId,
     required String name,
@@ -125,6 +135,7 @@ class AnalyticsRepository {
   }
 
   /// Get monthly spending trends
+  @override
   Future<Map<int, int>> getMonthlySpendingTrends({
     required String userId,
     required int year,
@@ -147,6 +158,7 @@ class AnalyticsRepository {
   }
 
   /// Compare spending between two months
+  @override
   Future<SpendingComparison?> compareMonths({
     required String userId,
     required int year1,
@@ -188,6 +200,7 @@ class AnalyticsRepository {
   }
 
   /// Get alerts for a user
+  @override
   Future<List<Alert>> getAlerts(String userId) async {
     try {
       return await remoteDataSource.getAlerts(userId);
@@ -198,6 +211,7 @@ class AnalyticsRepository {
   }
 
   /// Get unread alerts
+  @override
   Future<List<Alert>> getUnreadAlerts(String userId) async {
     try {
       final alerts = await getAlerts(userId);
@@ -209,6 +223,7 @@ class AnalyticsRepository {
   }
 
   /// Mark alert as read
+  @override
   Future<void> markAlertAsRead(String alertId) async {
     try {
       await remoteDataSource.markAlertAsRead(alertId);
@@ -219,6 +234,7 @@ class AnalyticsRepository {
   }
 
   /// Create a new alert
+  @override
   Future<Alert> createAlert({
     required String userId,
     required AlertType type,
@@ -249,20 +265,4 @@ class AnalyticsRepository {
       rethrow;
     }
   }
-}
-
-class SpendingComparison {
-  final int month1Spending;
-  final int month2Spending;
-  final int difference;
-  final double percentageChange;
-  final bool isIncreased;
-
-  SpendingComparison({
-    required this.month1Spending,
-    required this.month2Spending,
-    required this.difference,
-    required this.percentageChange,
-    required this.isIncreased,
-  });
 }

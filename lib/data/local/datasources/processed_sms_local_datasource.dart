@@ -72,11 +72,11 @@ class ProcessedSmsLocalDataSource {
     // large scans.
     const chunkSize = 500;
     for (var i = 0; i < hashes.length; i += chunkSize) {
-      final end = (i + chunkSize) > hashes.length ? hashes.length : i + chunkSize;
+      final end =
+          (i + chunkSize) > hashes.length ? hashes.length : i + chunkSize;
       final chunk = hashes.sublist(i, end);
       final rows = await (_db.select(_db.processedSmsMessages)
-            ..where((t) =>
-                t.userId.equals(userId) & t.messageHash.isIn(chunk)))
+            ..where((t) => t.userId.equals(userId) & t.messageHash.isIn(chunk)))
           .get();
       for (final row in rows) {
         known.add(row.messageHash);

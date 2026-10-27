@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/item_model.dart';
+import '../../../domain/entities/item_model.dart';
 
 class CategoryRemoteDataSource {
   final SupabaseClient _supabaseClient;

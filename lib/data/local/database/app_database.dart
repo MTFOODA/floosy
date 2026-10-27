@@ -286,7 +286,10 @@ class ItemUsages extends Table {
 ///
 /// The raw message body is never stored — only the stable hash plus parsed
 /// metadata (same privacy rule as the remote sms_messages table).
-@TableIndex(name: 'processed_sms_user_hash_unique', columns: {#userId, #messageHash}, unique: true)
+@TableIndex(
+    name: 'processed_sms_user_hash_unique',
+    columns: {#userId, #messageHash},
+    unique: true)
 class ProcessedSmsMessages extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
@@ -294,7 +297,8 @@ class ProcessedSmsMessages extends Table {
   TextColumn get messageHash => text()();
   DateTimeColumn get receivedAt => dateTime()();
   TextColumn get transactionId => text().nullable()();
-  DateTimeColumn get processedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get processedAt =>
+      dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -303,7 +307,10 @@ class ProcessedSmsMessages extends Table {
 /// LOCAL mirror of the complete sms_messages detection record. It is not a
 /// second detection system: it is the restart-safe local source for the same
 /// rows written remotely, including messages that need review.
-@TableIndex(name: 'sms_messages_user_hash_unique', columns: {#userId, #messageHash}, unique: true)
+@TableIndex(
+    name: 'sms_messages_user_hash_unique',
+    columns: {#userId, #messageHash},
+    unique: true)
 class SmsMessages extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
@@ -312,12 +319,18 @@ class SmsMessages extends Table {
   TextColumn get messageBody => text().nullable()();
   DateTimeColumn get receivedAt => dateTime()();
   DateTimeColumn get processedAt => dateTime().nullable()();
-  TextColumn get processingStatus => text().withDefault(const Constant('pending'))();
-  BoolColumn get bankIdentified => boolean().withDefault(const Constant(false))();
-  BoolColumn get typeIdentified => boolean().withDefault(const Constant(false))();
-  BoolColumn get amountIdentified => boolean().withDefault(const Constant(false))();
-  BoolColumn get currencyIdentified => boolean().withDefault(const Constant(false))();
-  BoolColumn get cardLast4Identified => boolean().withDefault(const Constant(false))();
+  TextColumn get processingStatus =>
+      text().withDefault(const Constant('pending'))();
+  BoolColumn get bankIdentified =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get typeIdentified =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get amountIdentified =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get currencyIdentified =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get cardLast4Identified =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get detectedBankId => text().nullable()();
   TextColumn get detectedBankName => text().nullable()();
   TextColumn get detectedType => text().nullable()();

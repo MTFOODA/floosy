@@ -1,5 +1,5 @@
 import '../local/datasources/money_local_datasource.dart';
-import '../models/item_model.dart';
+import '../../domain/entities/item_model.dart';
 
 /// Analyzes reusable-item usage and decides when an item is being consumed
 /// "unusually frequently" this month. Uses the user's own history as the

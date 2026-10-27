@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../../models/analytics_model.dart';
-import '../../models/budget_model.dart';
+import '../../../domain/entities/analytics_model.dart';
+import '../../../domain/entities/budget_model.dart';
 
 class AnalyticsRemoteDataSource {
   final SupabaseClient _supabaseClient;

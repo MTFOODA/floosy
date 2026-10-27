@@ -6,6 +6,8 @@ class AuthRepository {
 
   AuthRepository(this._remoteDataSource);
 
+  Future<bool> signInWithGoogle() => _remoteDataSource.signInWithGoogle();
+
   Future<AuthResponse> signUp({
     required String email,
     required String password,

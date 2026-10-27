@@ -38,6 +38,59 @@
 --   10. Storage       11. Seed data         12. Grants
 -- =============================================================================
 
+-- WARNING: Permanently removes application objects in public.
+-- Does not intentionally delete auth.users or storage objects.
+
+DO $$
+DECLARE
+    obj RECORD;
+BEGIN
+    -- Drop application tables and dependent objects.
+    FOR obj IN
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format(
+            'DROP TABLE IF EXISTS public.%I CASCADE',
+            obj.tablename
+        );
+    END LOOP;
+
+    -- Drop remaining views.
+    FOR obj IN
+        SELECT viewname
+        FROM pg_views
+        WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format(
+            'DROP VIEW IF EXISTS public.%I CASCADE',
+            obj.viewname
+        );
+    END LOOP;
+
+    -- Drop application enum and other custom types.
+    FOR obj IN
+        SELECT t.typname
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = 'public'
+          AND t.typtype IN ('e', 'd')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM pg_class c
+              WHERE c.reltype = t.oid
+          )
+    LOOP
+        EXECUTE format(
+            'DROP TYPE IF EXISTS public.%I CASCADE',
+            obj.typname
+        );
+    END LOOP;
+END $$;
+
+
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

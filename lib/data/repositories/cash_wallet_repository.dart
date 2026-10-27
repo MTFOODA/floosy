@@ -1,13 +1,20 @@
-import '../models/item_model.dart';
+import '../../domain/repositories/cash_wallet_repository.dart' as domain;
+import '../../domain/entities/item_model.dart';
+import '../../domain/entities/transaction_model.dart' show Transaction;
 import '../remote/datasources/cash_wallet_remote_datasource.dart';
 import '../../core/utils/app_logger.dart';
 
-class CashWalletRepository {
+class CashWalletRepository implements domain.CashWalletRepository {
   final CashWalletRemoteDataSource remoteDataSource;
 
   CashWalletRepository({required this.remoteDataSource});
 
+  @override
+  Future<void> ensureExpenseMovement(Transaction transaction) =>
+      remoteDataSource.ensureExpenseMovement(transaction);
+
   /// Get cash balance for a user
+  @override
   Future<int> getCashBalance(String userId) async {
     try {
       return await remoteDataSource.getCashBalance(userId);
@@ -18,6 +25,7 @@ class CashWalletRepository {
   }
 
   /// Get or create cash wallet for a user
+  @override
   Future<CashWallet> getOrCreateWallet(String userId, String currency) async {
     try {
       return await remoteDataSource.getOrCreateWallet(userId, currency);
@@ -28,6 +36,7 @@ class CashWalletRepository {
   }
 
   /// Record a cash movement (in or out)
+  @override
   Future<CashMovement> recordMovement({
     required String userId,
     required String walletId,
@@ -54,6 +63,7 @@ class CashWalletRepository {
   }
 
   /// Get all cash movements for a user
+  @override
   Future<List<CashMovement>> getMovements(String userId) async {
     try {
       return await remoteDataSource.getMovements(userId);
@@ -64,6 +74,7 @@ class CashWalletRepository {
   }
 
   /// Get cash movements for a specific month
+  @override
   Future<List<CashMovement>> getMonthlyMovements({
     required String userId,
     required int year,
@@ -82,6 +93,7 @@ class CashWalletRepository {
   }
 
   /// Get total cash inflow for a period
+  @override
   Future<int> getTotalInflow({
     required String userId,
     required DateTime startDate,
@@ -102,6 +114,7 @@ class CashWalletRepository {
   }
 
   /// Get total cash outflow for a period
+  @override
   Future<int> getTotalOutflow({
     required String userId,
     required DateTime startDate,
@@ -122,6 +135,7 @@ class CashWalletRepository {
   }
 
   /// Add cash to wallet
+  @override
   Future<CashMovement> addCash({
     required String userId,
     required String walletId,
@@ -138,6 +152,7 @@ class CashWalletRepository {
   }
 
   /// Withdraw cash from wallet
+  @override
   Future<CashMovement> withdrawCash({
     required String userId,
     required String walletId,
@@ -154,6 +169,7 @@ class CashWalletRepository {
   }
 
   /// Adjust cash balance (for corrections)
+  @override
   Future<CashMovement> adjustBalance({
     required String userId,
     required String walletId,

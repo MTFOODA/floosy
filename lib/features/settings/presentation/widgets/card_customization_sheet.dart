@@ -1,14 +1,15 @@
+import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../data/models/detected_card_model.dart';
-import '../../../../data/repositories/detected_card_repository.dart';
+import '../../../../domain/entities/detected_card_model.dart';
+import '../cubit/cards_cubit.dart';
 import 'detected_bank_card.dart';
 
 /// Bottom sheet for customizing one card's appearance (requirement #11).
 class CardCustomizationSheet extends StatefulWidget {
   final DetectedCard card;
-  final DetectedCardRepository repository;
+  final CardsCubit repository;
 
   const CardCustomizationSheet({
     super.key,

@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
-import '../../../../data/models/detected_card_model.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 import '../widgets/detected_bank_card.dart';
 import '../widgets/card_customization_sheet.dart';
 
 /// "Detected Cards" page (requirement #6). Accessible from Settings.
-class DetectedCardsScreen extends ConsumerWidget {
+class DetectedCardsScreen extends StatelessWidget {
   const DetectedCardsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final cardsAsync = ref.watch(detectedCardsProvider);
+    final cardsAsync = context.watch<CardsCubit>().state;
 
     return Scaffold(
       backgroundColor: context.fc.background,
@@ -58,7 +58,7 @@ class DetectedCardsScreen extends ConsumerWidget {
               cardsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (_, __) => _ErrorView(),
-                data: (cards) => _buildContent(context, ref, l, cards),
+                data: (cards) => _buildContent(context, l, cards),
               ),
             ],
           ),
@@ -67,8 +67,8 @@ class DetectedCardsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, WidgetRef ref, AppLocalizations l,
-      List<DetectedCard> cards) {
+  Widget _buildContent(
+      BuildContext context, AppLocalizations l, List<DetectedCard> cards) {
     if (cards.isEmpty) {
       return _EmptyCardsView(l: l);
     }
@@ -95,7 +95,7 @@ class DetectedCardsScreen extends ConsumerWidget {
                 children: [
                   DetectedBankCard(
                     card: card,
-                    onEdit: () => _openCustomization(context, ref, card),
+                    onEdit: () => _openCustomization(context, card),
                     showEye: false,
                   ),
                   const SizedBox(height: 6),
@@ -111,8 +111,8 @@ class DetectedCardsScreen extends ConsumerWidget {
   }
 
   Future<void> _openCustomization(
-      BuildContext context, WidgetRef ref, DetectedCard card) async {
-    final repo = ref.read(detectedCardRepositoryProvider);
+      BuildContext context, DetectedCard card) async {
+    final repo = context.read<CardsCubit>();
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -120,7 +120,7 @@ class DetectedCardsScreen extends ConsumerWidget {
       builder: (_) => CardCustomizationSheet(card: card, repository: repo),
     );
     if (changed == true) {
-      ref.invalidate(detectedCardsProvider);
+      repo.reload();
     }
   }
 }

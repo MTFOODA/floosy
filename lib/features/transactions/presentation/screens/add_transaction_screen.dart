@@ -1,35 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/transactions/presentation/cubit/transaction_commands_cubit.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/app_logger.dart';
-import '../../../../data/models/transaction_model.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../domain/entities/transaction_model.dart';
+import '../../../../routing/app_routes.dart';
 
 /// Manual "Add Transaction" screen (Transactions → +).
 ///
 /// Creates a single manual transaction record with the user-chosen type,
 /// amount, currency and optional note. Ownership is enforced through the
-/// authenticated [currentUserIdProvider]. Creating a transaction here is a
+/// authenticated [AuthCubit]. Creating a transaction here is a
 /// record-keeping action — it intentionally does NOT move Pocket Cash, and
 /// it never touches SMS-derived balance logic.
-class AddTransactionScreen extends ConsumerStatefulWidget {
+class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
   @override
-  ConsumerState<AddTransactionScreen> createState() =>
-      _AddTransactionScreenState();
+  State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
-class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
+class _AddTransactionScreenState extends State<AddTransactionScreen> {
   TransactionType _type = TransactionType.purchase;
   String _currency = 'EGP';
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
-  bool _saving = false;
+  bool get _saving => context.read<TransactionCommandsCubit>().state.busy;
 
   static const _currencies = ['EGP', 'USD', 'EUR', 'GBP', 'SAR', 'AED', 'KWD'];
 
@@ -49,28 +48,15 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           .showSnackBar(SnackBar(content: Text(l['invalidAmount'])));
       return;
     }
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
 
-    setState(() => _saving = true);
     try {
-      final id = const Uuid().v4();
-      await ref.read(transactionRepositoryProvider).createTransaction(
-            transaction: Transaction(
-              id: id,
-              userId: userId,
-              type: _type,
-              source: TransactionSource.manual,
-              amountMinor: (amount * 100).round(),
-              currency: _currency,
-              transactionDate: DateTime.now(),
-              merchantName: _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-              fingerprint: 'manual_$id',
-              status: TransactionStatus.confirmed,
-            ),
-          );
+      await context.read<TransactionCommandsCubit>().createManual(
+          type: _type,
+          amountMinor: (amount * 100).round(),
+          currency: _currency,
+          note: _noteController.text);
       logInfo('NAV_BACK add-transaction saved → popping');
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -79,13 +65,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l['failedToLoad'])));
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    context.watch<TransactionCommandsCubit>();
     final l = AppLocalizations.s(context);
     return Scaffold(
       backgroundColor: context.fc.background,

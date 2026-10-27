@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../models/transaction_model.dart';
+import '../../../domain/entities/transaction_model.dart';
 
 /// Remote data source for the `sms_messages` table. Stores the original
 /// message plus the complete detection result for every eligible bank/wallet
@@ -130,9 +130,10 @@ class SmsRemoteDataSource {
   // A deleted SMS-derived transaction is detached from its source row, while
   // the row remains processed and therefore cannot recreate the transaction.
   Future<void> deleteTransactionReferences(String transactionId) async {
-    await _supabaseClient.from('sms_messages')
-        .update({'transaction_id': null, 'processing_status': 'processed'})
-        .eq('transaction_id', transactionId);
+    await _supabaseClient
+        .from('sms_messages')
+        .update({'transaction_id': null, 'processing_status': 'processed'}).eq(
+            'transaction_id', transactionId);
   }
 
   Future<List<SMSMessage>> getSmsMessages({

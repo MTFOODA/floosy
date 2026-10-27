@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../models/transaction_model.dart';
+import '../../../domain/entities/transaction_model.dart';
 
 /// Card purchases, ATM withdrawals and income recorded from bank SMS or
 /// manual entry. Note: cash transactions are handled by the local engine
@@ -9,10 +9,18 @@ class TransactionRemoteDataSource {
 
   TransactionRemoteDataSource(this._supabaseClient);
 
+  // PostgreSQL interprets an ISO timestamp without an offset in the server's
+  // timezone. Always send an explicit UTC instant, including for bank times
+  // parsed in the phone's local timezone.
+  Map<String, dynamic> _remoteJson(Transaction transaction) =>
+      transaction.toJson()
+        ..['transaction_date'] =
+            transaction.transactionDate.toUtc().toIso8601String();
+
   Future<Transaction> createTransaction(Transaction transaction) async {
     final response = await _supabaseClient
         .from('transactions')
-        .insert(transaction.toJson()
+        .insert(_remoteJson(transaction)
           ..remove('created_at')
           ..remove('updated_at'))
         .select()
@@ -38,7 +46,7 @@ class TransactionRemoteDataSource {
   Future<void> updateTransaction(Transaction transaction) async {
     await _supabaseClient
         .from('transactions')
-        .update(transaction.toJson()..remove('created_at'))
+        .update(_remoteJson(transaction)..remove('created_at'))
         .eq('id', transaction.id);
   }
 

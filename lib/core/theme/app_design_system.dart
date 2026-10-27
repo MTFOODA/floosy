@@ -5,9 +5,9 @@ class FloosyDesign {
   FloosyDesign._();
 
   // ── Colors ──────────────────────────────────────────────────────────────
-  static const Color background = Color(0xFF080A18);
+  static const Color background = Color(0xFF0C0E1B);
   static const Color backgroundAlt = Color(0xFF080D1A);
-  static const Color authBackground = Color(0xFF0D1020);
+  static const Color authBackground = Color(0xFF0C0E1B);
   static const Color primarySurface = Color(0xFF151827);
   static const Color secondarySurface = Color(0xFF191C2D);
   static const Color elevatedSurface = Color(0xFF1D2033);
@@ -21,8 +21,8 @@ class FloosyDesign {
   static const Color borderLight = Color(0x0FFFFFFF);
   static const Color inputBorder = Color(0xFF2A3042);
 
-  static const Color primaryPurple = Color(0xFF7C5CFF);
-  static const Color brightPurple = Color(0xFF8B6CFF);
+  static const Color primaryPurple = Color(0xFF806DF3);
+  static const Color brightPurple = Color(0xFF9B8AFF);
   static const Color purpleStart = Color(0xFF6F5BD3);
   static const Color purpleEnd = Color(0xFF8A78E8);
   static const Color blue = Color(0xFF55AFFF);
@@ -130,12 +130,12 @@ class FloosyDesign {
   static const double xxxl = 32;
 
   // ── Radii ───────────────────────────────────────────────────────────────
-  static const double radiusLarge = 28;
-  static const double radiusXL = 30;
-  static const double radiusMedium = 20;
+  static const double radiusLarge = 20;
+  static const double radiusXL = 24;
+  static const double radiusMedium = 16;
   static const double radiusSmall = 16;
-  static const double radiusInput = 20;
-  static const double radiusButton = 20;
+  static const double radiusInput = 14;
+  static const double radiusButton = 14;
   static const double radiusPill = 999;
 
   // ── Animation Durations ─────────────────────────────────────────────────

@@ -1,33 +1,38 @@
+import '../../../../domain/entities/image_reference.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:floosy/features/items/presentation/cubit/items_cubit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../core/providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../../../core/utils/money_formatter.dart';
-import '../../../../data/models/item_model.dart';
-import '../../../../data/services/item_image_service.dart';
+import '../../../../domain/entities/item_model.dart';
+import '../../../../core/theme/item_appearance.dart';
+import '../../../../core/theme/app_design_system.dart';
+import '../../../../core/widgets/common/item_avatar.dart';
+import '../../../../domain/usecases/save_item.dart';
 import '../../../../core/widgets/common/item_image.dart';
-import '../../../../routing/app_router.dart';
+import '../../../../routing/app_routes.dart';
 
 /// Item management — lives INSIDE Settings per product spec.
 ///
 /// Add / Edit / Disable-Enable / Delete items with name, price and image.
 /// Images are uploaded to the Supabase `item-images` bucket (user-isolated
 /// folder). Deleting asks first; archiving is preferred so history stays.
-class ItemsScreen extends ConsumerStatefulWidget {
+class ItemsScreen extends StatefulWidget {
   const ItemsScreen({super.key});
 
   @override
-  ConsumerState<ItemsScreen> createState() => _ItemsScreenState();
+  State<ItemsScreen> createState() => _ItemsScreenState();
 }
 
-class _ItemsScreenState extends ConsumerState<ItemsScreen> {
+class _ItemsScreenState extends State<ItemsScreen> {
   @override
   Widget build(BuildContext context) {
-    final userId = ref.watch(currentUserIdProvider);
+    final userId = context.watch<AuthCubit>().state.userId;
     final l = AppLocalizations.s(context);
 
     if (userId == null) {
@@ -37,7 +42,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
       );
     }
 
-    final itemsAsync = ref.watch(allItemsProvider(userId));
+    final itemsAsync =
+        context.watch<ItemsCubit>().state.map((data) => data.all);
 
     return Scaffold(
       appBar: AppBar(
@@ -64,7 +70,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
               Text(l['failedToLoad']),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: () => ref.invalidate(allItemsProvider(userId)),
+                onPressed: () => context.read<ItemsCubit>().reload(),
                 child: Text(l['retry']),
               ),
             ],
@@ -94,38 +100,21 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           }
           return RefreshIndicator(
             onRefresh: () async {
-              ref.invalidate(allItemsProvider(userId));
-              ref.invalidate(dashboardItemsProvider(userId));
+              context.read<ItemsCubit>().reload();
+              context.read<ItemsCubit>().reload();
             },
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
-                // Archived items are "deleted" from the user's perspective —
-                // never shown in Manage Items, matching Home.
-                final visible = items.where((i) => !i.isArchived).toList();
-                final horizontalPad = constraints.maxWidth < 360 ? 24.0 : 32.0;
-                final cardWidth = (constraints.maxWidth -
-                        horizontalPad -
-                        12 * (crossAxisCount - 1)) /
-                    crossAxisCount;
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    // Extent scales with card width so image + name + price
-                    // always fit — no dead space, no overflow at 320-430px.
-                    mainAxisExtent: (cardWidth * 1.05).clamp(150.0, 200.0),
-                  ),
-                  itemCount: visible.length,
-                  itemBuilder: (context, index) => _ItemManagementCard(
-                    item: visible[index],
-                    onEdit: () => _showItemDialog(visible[index]),
-                    onToggleActive: () => _toggleActive(visible[index]),
-                    onDelete: () => _deleteItem(visible[index]),
-                  ),
-                );
+            child: ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: items.where((item) => !item.isArchived).length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item =
+                    items.where((item) => !item.isArchived).elementAt(index);
+                return _ItemManagementCard(
+                    item: item,
+                    onEdit: () => _showItemDialog(item),
+                    onToggleActive: () => _toggleActive(item),
+                    onDelete: () => _deleteItem(item));
               },
             ),
           );
@@ -146,50 +135,138 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
               .toStringAsFixed(existing.priceMinor % 100 == 0 ? 0 : 2),
     );
     String? imageUrl = existing?.imageUrl;
+    var appearance = ItemAppearance.decode(existing?.icon);
 
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? l['addItem'] : l['editItem']),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ImagePickerTile(
-                  imageUrl: imageUrl,
-                  onPicked: (path) => setDialogState(() => imageUrl = path),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(labelText: l['itemName']),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameArController,
-                  decoration: InputDecoration(labelText: l['itemNameAr']),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: priceController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l['itemPrice']),
-                ),
-              ],
+        builder: (context, setDialogState) => Dialog.fullscreen(
+          child: Scaffold(
+            backgroundColor: context.fc.background,
+            appBar: AppBar(
+              leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => Navigator.pop(dialogContext, false)),
+              title: Text(existing == null ? l['addItem'] : l['editItem']),
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ImagePickerTile(
+                    imageUrl: imageUrl,
+                    onPicked: (path) => setDialogState(() => imageUrl = path),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child:
+                          Text(l['itemIcon'], style: context.fc.bodyTextSmall)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 6, runSpacing: 6, children: [
+                    for (final symbol in ItemAppearance.symbols)
+                      Semantics(
+                          selected: appearance.symbol == symbol,
+                          button: true,
+                          child: InkWell(
+                            onTap: () => setDialogState(() => appearance =
+                                ItemAppearance(
+                                    symbol: symbol, color: appearance.color)),
+                            borderRadius: BorderRadius.circular(12),
+                            child: AnimatedContainer(
+                                duration: FloosyDesign.fast,
+                                width: 34,
+                                height: 34,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                    color: appearance.symbol == symbol
+                                        ? appearance.color
+                                            .withValues(alpha: .25)
+                                        : context.fc.cardSurface,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: appearance.symbol == symbol
+                                            ? appearance.color
+                                            : Colors.transparent)),
+                                child: Text(symbol,
+                                    style: const TextStyle(fontSize: 19))),
+                          )),
+                  ]),
+                  const SizedBox(height: 14),
+                  Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(l['itemColor'],
+                          style: context.fc.bodyTextSmall)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (var i = 0; i < ItemAppearance.colors.length; i++)
+                      Tooltip(
+                        message: l[ItemAppearance.colorLabels[i]],
+                        child: Semantics(
+                            button: true,
+                            label: l[ItemAppearance.colorLabels[i]],
+                            selected:
+                                appearance.color == ItemAppearance.colors[i],
+                            child: InkWell(
+                              onTap: () => setDialogState(() => appearance =
+                                  ItemAppearance(
+                                      symbol: appearance.symbol,
+                                      color: ItemAppearance.colors[i])),
+                              customBorder: const CircleBorder(),
+                              child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                      color: ItemAppearance.colors[i],
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: appearance.color ==
+                                                  ItemAppearance.colors[i]
+                                              ? Colors.white
+                                              : Colors.transparent,
+                                          width: 2)),
+                                  child: appearance.color ==
+                                          ItemAppearance.colors[i]
+                                      ? const Icon(Icons.check,
+                                          size: 16, color: Color(0xFF151827))
+                                      : null),
+                            )),
+                      ),
+                  ]),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(labelText: l['itemName']),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameArController,
+                    decoration: InputDecoration(labelText: l['itemNameAr']),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: priceController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: l['itemPrice']),
+                  ),
+                ],
+              ),
+            ),
+            bottomNavigationBar: SafeArea(
+              minimum: const EdgeInsets.all(20),
+              child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF147FA9),
+                        foregroundColor: Colors.white),
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: Text(existing == null ? l['add'] : l['save']),
+                  )),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(l['cancel']),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(existing == null ? l['add'] : l['save']),
-            ),
-          ],
         ),
       ),
     );
@@ -199,7 +276,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     final price = double.tryParse(priceController.text.replaceAll(',', '.'));
     if (name.isEmpty || price == null || price <= 0) return;
     final priceMinor = (price * 100).round();
-    final userId = ref.read(currentUserIdProvider);
+    final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
 
     await _persistItem(
@@ -210,6 +287,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           ? null
           : nameArController.text.trim(),
       priceMinor: priceMinor,
+      icon: appearance.encode(),
       pickedImagePath:
           imageUrl != null && !imageUrl!.startsWith('http') ? imageUrl : null,
     );
@@ -221,66 +299,20 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     required String name,
     required String? nameAr,
     required int priceMinor,
+    required String icon,
     required String? pickedImagePath,
   }) async {
     final l = AppLocalizations.s(context);
-    final repo = ref.read(itemRepositoryProvider);
+    final repo = context.read<ItemsCubit>();
     try {
-      if (existing == null) {
-        final created = await repo.createItem(
+      await repo.save(ItemDraft(
+          existing: existing,
           userId: userId,
           name: name,
           nameAr: nameAr,
           priceMinor: priceMinor,
-          currency: 'EGP',
-        );
-        if (pickedImagePath != null) {
-          final url = await ref.read(itemImageServiceProvider).uploadImage(
-                userId: userId,
-                itemId: created.id,
-                filePath: pickedImagePath,
-              );
-          if (url != null) {
-            logInfo('ITEM_IMAGE_DATABASE_VALUE itemId=${created.id} '
-                'image_url=$url');
-            await repo.updateItem(created.copyWith(imageUrl: url));
-          } else {
-            logWarning('ITEM_IMAGE skipped: upload failed for '
-                'itemId=${created.id} — item saved without image');
-          }
-        }
-      } else {
-        // Only upload when the user actually chose a NEW local file in the
-        // picker. The dialog's image state starts as the existing storage
-        // reference (e.g. `{userId}/{itemId}.jpg`); feeding that to
-        // uploadImage() would try to read a non-existent local file, the
-        // upload returns null, and the current image_url would be erased.
-        // Cancelling the picker also leaves the existing reference untouched.
-        String? finalUrl = existing.imageUrl;
-        if (pickedImagePath != null && isLocalFilePath(pickedImagePath)) {
-          finalUrl = await ref.read(itemImageServiceProvider).uploadImage(
-                userId: userId,
-                itemId: existing.id,
-                filePath: pickedImagePath,
-              );
-        }
-        final priceChanged = existing.priceMinor != priceMinor;
-        final updated = existing.copyWith(
-          name: name,
-          nameAr: nameAr,
-          priceMinor: priceMinor,
-          imageUrl: finalUrl,
-        );
-        await repo.updateItem(updated);
-        // Record price history only when the price actually changed;
-        // historical transactions keep their original amounts.
-        if (priceChanged) {
-          await repo.updatePrice(
-              itemId: existing.id, newPriceMinor: priceMinor);
-        }
-      }
-      ref.invalidate(allItemsProvider(userId));
-      ref.invalidate(dashboardItemsProvider(userId));
+          icon: icon,
+          pickedImagePath: pickedImagePath));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -295,17 +327,12 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
 
   Future<void> _toggleActive(Item item) async {
     final l = AppLocalizations.s(context);
-    final repo = ref.read(itemRepositoryProvider);
+    final repo = context.read<ItemsCubit>();
     try {
       if (item.isActive) {
         await repo.deactivateItem(item.id);
       } else {
         await repo.updateItem(item.copyWith(isActive: true));
-      }
-      final userId = ref.read(currentUserIdProvider);
-      if (userId != null) {
-        ref.invalidate(allItemsProvider(userId));
-        ref.invalidate(dashboardItemsProvider(userId));
       }
     } catch (e) {
       if (mounted) {
@@ -338,19 +365,15 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    final cubit = context.read<ItemsCubit>();
+    final userId = context.read<AuthCubit>().state.userId;
     try {
       // Archive instead of hard delete so historical records stay intact.
       // Best-effort cleanup of the stored image.
-      await ref.read(itemRepositoryProvider).archiveItem(item.id);
-      final imageService = ref.read(itemImageServiceProvider);
-      final userId = ref.read(currentUserIdProvider);
+      await cubit.archiveItem(item.id);
       if (userId != null) {
-        await imageService.deleteImage(userId: userId, itemId: item.id);
-        // Invalidate BOTH item providers so the deleted item disappears from
-        // Manage Items AND Home immediately (single source of truth).
-        ref.invalidate(allItemsProvider(userId));
-        ref.invalidate(dashboardItemsProvider(userId));
+        await cubit.deleteImage(userId: userId, itemId: item.id);
       }
     } catch (e) {
       if (mounted) {
@@ -366,128 +389,80 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
 }
 
 /// All items (active + inactive) for management.
-final allItemsProvider =
-    FutureProvider.autoDispose.family<List<Item>, String>((ref, userId) async {
-  return ref.watch(itemRepositoryProvider).getAllItems(userId);
-});
 
 class _ItemManagementCard extends StatelessWidget {
   final Item item;
-  final VoidCallback onEdit;
-  final VoidCallback onToggleActive;
-  final VoidCallback onDelete;
-
-  const _ItemManagementCard({
-    required this.item,
-    required this.onEdit,
-    required this.onToggleActive,
-    required this.onDelete,
-  });
-
+  final VoidCallback onEdit, onToggleActive, onDelete;
+  const _ItemManagementCard(
+      {required this.item,
+      required this.onEdit,
+      required this.onToggleActive,
+      required this.onDelete});
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
-    final active = item.isActive && !item.isArchived;
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    return Material(
+      color: context.fc.cardSurface,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onEdit,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image area — always visible. Resolves the real stored image
-            // (signed URL for the private bucket) with a graceful fallback.
-            // Controlled, intentional image area (top of card). A fixed height
-            // avoids the large empty placeholder block and keeps the layout
-            // stable regardless of whether an image was attached.
-            SizedBox(
-              height: 72,
-              width: double.infinity,
-              child: FloosyItemImage(
-                imageUrl: item.imageUrl,
-                fit: BoxFit.cover,
-                fallback: const _ImagePlaceholder(),
-              ),
-            ),
-            // Content takes the remaining height. It is Expanded (not a rigid
-            // flex:2 slice) so the name row + price always fit instead of being
-            // squeezed into too little space (the original 15 px overflow).
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              border: Border.all(color: context.fc.borderSubtle),
+              borderRadius: BorderRadius.circular(16)),
+          child: Row(children: [
+            ItemAvatar(item: item),
+            const SizedBox(width: 12),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.nameAr ?? item.name,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              decoration:
-                                  active ? null : TextDecoration.lineThrough,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          onSelected: (value) {
-                            if (value == 'edit') onEdit();
-                            if (value == 'toggle') onToggleActive();
-                            if (value == 'delete') onDelete();
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                                value: 'edit', child: Text(l['edit'])),
-                            PopupMenuItem(
-                                value: 'toggle',
-                                child:
-                                    Text(active ? l['disable'] : l['enable'])),
-                            PopupMenuItem(
-                                value: 'delete', child: Text(l['delete'])),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatMoney(item.priceMinor),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(item.nameAr ?? item.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.fc.textPrimary,
+                          decoration: item.isActive
+                              ? null
+                              : TextDecoration.lineThrough)),
+                  const SizedBox(height: 4),
+                  Text(formatMoney(item.priceMinor),
+                      style: context.fc.bodyTextSmall)
+                ])),
+            IconButton(
+                onPressed: onEdit,
+                tooltip: l['edit'],
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit_rounded,
+                    size: 19, color: FloosyDesign.blue)),
+            PopupMenuButton<String>(
+                tooltip: l['seeAll'],
+                onSelected: (value) =>
+                    value == 'delete' ? onDelete() : onToggleActive(),
+                itemBuilder: (_) => [
+                      PopupMenuItem(
+                          value: 'toggle',
+                          child: Text(l[item.isActive ? 'disable' : 'enable'])),
+                      PopupMenuItem(
+                          value: 'delete',
+                          child: Row(children: [
+                            const Icon(Icons.delete_outline_rounded,
+                                size: 19, color: FloosyDesign.negative),
+                            const SizedBox(width: 8),
+                            Text(l['delete'])
+                          ])),
+                    ]),
+          ]),
         ),
       ),
     );
   }
 }
 
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(Icons.image_outlined, size: 32, color: Colors.grey[500]),
-    );
-  }
-}
-
-/// Image picker tile used inside the item dialog. Shows the current image
-/// (network or local file) and opens the gallery picker on tap.
 class _ImagePickerTile extends StatelessWidget {
   final String? imageUrl;
   final ValueChanged<String> onPicked;
@@ -506,7 +481,6 @@ class _ImagePickerTile extends StatelessWidget {
           maxHeight: 1024,
           imageQuality: 80,
         );
-        if (picked != null) onPicked(picked.path);
         if (picked != null) {
           logInfo('ITEM_IMAGE_PICKER picked.path=${picked.path} '
               'isLocal=${isLocalFilePath(picked.path)} '
