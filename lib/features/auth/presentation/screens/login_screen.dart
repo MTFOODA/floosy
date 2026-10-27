@@ -184,16 +184,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Align(
-                    alignment: AlignmentDirectional.centerEnd,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Tooltip(
                       message: l['selectLanguage'],
                       child: SegmentedButton<String>(
+                        showSelectedIcon: false,
                         segments: const [
                           ButtonSegment(value: 'ar', label: Text('العربية')),
                           ButtonSegment(value: 'en', label: Text('English')),
                         ],
                         selected: {l.locale.languageCode},
                         style: SegmentedButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          minimumSize: const Size(0, 32),
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.padded,
                           backgroundColor: context.fc.toggleBackground,
                           foregroundColor: context.fc.textSecondary,
                           selectedBackgroundColor: FloosyDesign.primaryPurple,
