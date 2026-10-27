@@ -7,7 +7,7 @@ import '../../utils/app_logger.dart';
 import '../../../routing/app_routes.dart';
 
 /// Premium bottom navigation shared across all main screens.
-/// 5 items: Home, Transactions, AI Agent, Analysis, Settings.
+/// 5 items: AI Agent, Transactions, Home (center), Analysis, Settings.
 class FloosyBottomNav extends StatefulWidget {
   final Widget child;
   const FloosyBottomNav({super.key, required this.child});
@@ -17,23 +17,17 @@ class FloosyBottomNav extends StatefulWidget {
 }
 
 class _FloosyBottomNavState extends State<FloosyBottomNav> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
 
   static const _routes = [
-    AppRoutes.dashboard,
+    AppRoutes.aiChat,
     AppRoutes.transactions,
-    '',
+    AppRoutes.dashboard,
     AppRoutes.analytics,
     AppRoutes.settings,
   ];
 
-  static const _aiRoute = AppRoutes.aiChat;
-
   void _onTap(int index) {
-    if (index == 2) {
-      context.go(_aiRoute);
-      return;
-    }
     final route = _routes[index];
     if (route.isNotEmpty && index != _currentIndex) {
       setState(() => _currentIndex = index);
@@ -45,11 +39,11 @@ class _FloosyBottomNavState extends State<FloosyBottomNav> {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location == AppRoutes.dashboard) {
-      _currentIndex = 0;
+      _currentIndex = 2;
     } else if (location == AppRoutes.transactions) {
       _currentIndex = 1;
     } else if (location == AppRoutes.aiChat) {
-      _currentIndex = 2;
+      _currentIndex = 0;
     } else if (location == AppRoutes.analytics) {
       _currentIndex = 3;
     } else if (location == AppRoutes.settings) {
@@ -76,9 +70,9 @@ class _FloosyBottomNavState extends State<FloosyBottomNav> {
 
     final l = AppLocalizations.s(context);
     final labels = [
-      l['navHome'],
-      l['navTransactions'],
       l['navAI'],
+      l['navTransactions'],
+      l['navHome'],
       l['navAnalysis'],
       l['navSettings'],
     ];
@@ -113,7 +107,7 @@ class _FloosyBottomNavState extends State<FloosyBottomNav> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _NavItem(
-                        icon: Icons.home_rounded,
+                        icon: Icons.smart_toy_rounded,
                         label: labels[0],
                         isActive: _currentIndex == 0,
                         onTap: () => _onTap(0),
@@ -124,7 +118,7 @@ class _FloosyBottomNavState extends State<FloosyBottomNav> {
                         isActive: _currentIndex == 1,
                         onTap: () => _onTap(1),
                       ),
-                      _AIAgentButton(
+                      _HomeButton(
                         label: labels[2],
                         isActive: _currentIndex == 2,
                         onTap: () => _onTap(2),
@@ -203,11 +197,11 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _AIAgentButton extends StatelessWidget {
+class _HomeButton extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
-  const _AIAgentButton(
+  const _HomeButton(
       {required this.label, required this.isActive, required this.onTap});
 
   @override
@@ -237,8 +231,8 @@ class _AIAgentButton extends StatelessWidget {
                         radius: 14, opacity: 0.3)
                     : null,
               ),
-              child: const Icon(Icons.desktop_windows_rounded,
-                  color: Colors.white, size: 22),
+              child:
+                  const Icon(Icons.home_rounded, color: Colors.white, size: 22),
             ),
             const SizedBox(height: 3),
             Text(label,

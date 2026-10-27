@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../domain/entities/auth_session.dart';
 import '../../../../routing/app_routes.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/localization/preferences_cubit.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/widgets/auth/auth_brand_header.dart';
 import '../../../../core/widgets/auth/auth_mode_switch.dart';
@@ -182,7 +183,36 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 50),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Tooltip(
+                      message: l['selectLanguage'],
+                      child: SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'ar', label: Text('العربية')),
+                          ButtonSegment(value: 'en', label: Text('English')),
+                        ],
+                        selected: {l.locale.languageCode},
+                        style: SegmentedButton.styleFrom(
+                          backgroundColor: context.fc.toggleBackground,
+                          foregroundColor: context.fc.textSecondary,
+                          selectedBackgroundColor: FloosyDesign.primaryPurple,
+                          selectedForegroundColor: Colors.white,
+                          side: BorderSide(color: context.fc.borderSubtle),
+                        ),
+                        onSelectionChanged: (selection) {
+                          setState(() {
+                            _errorMessage = null;
+                            _isEmailNotConfirmed = false;
+                          });
+                          context
+                              .read<LocaleCubit>()
+                              .setLocale(Locale(selection.single));
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   const AuthBrandHeader(),
                   const SizedBox(height: 32),
                   const AuthModeSwitch(),

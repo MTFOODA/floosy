@@ -104,7 +104,8 @@ class _IosBankMessagesScreenState extends State<IosBankMessagesScreen> {
             SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: Text(l['iosSmsEnable']),
-                subtitle: Text(l['iosSmsPrivacy']),
+                subtitle: Text(
+                    '${l['iosSmsPermissionHelp']}\n\n${l['iosSmsPrivacy']}'),
                 value: inbox?.enabled ?? false,
                 onChanged: _busy || inbox == null
                     ? null

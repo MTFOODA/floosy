@@ -2,7 +2,7 @@ name: floosy
 description: "A financial management app for personal expenses and budgeting in Arabic and English."
 publish_to: "none"
 
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ">=3.1.0 <4.0.0"
@@ -72,6 +72,9 @@ flutter:
 
 flutter_launcher_icons:
   android: true
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"
   windows:
     generate: true
     image_path: "assets/logo/floosy.png"

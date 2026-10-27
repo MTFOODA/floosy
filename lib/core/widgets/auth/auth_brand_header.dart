@@ -12,6 +12,18 @@ class AuthBrandHeader extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        Container(
+          width: 104,
+          height: 104,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Image.asset('assets/logo/floosy.png',
+              fit: BoxFit.contain, semanticLabel: 'Floosy'),
+        ),
+        const SizedBox(height: 12),
         Text('Floosy', style: context.fc.logo),
         const SizedBox(height: 4),
         Text(

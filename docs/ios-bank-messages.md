@@ -12,6 +12,7 @@ Successful/previously processed messages leave the queue. Processor failures rem
 
 1. Install the latest physical-device IPA using the [installation guide](iphone-installation.md). The simulator build cannot receive cellular SMS.
 2. Open Floosy, sign in, then enable **Settings → Bank messages on iPhone → Enable bank message import**.
+   iOS does not show an Android-style SMS permission dialog. This switch and the Shortcuts automation are the setup required for this import path.
 3. On the iPhone, open **Shortcuts → Automation → New Automation → Message**. Labels vary by iOS version.
 4. Select the bank sender or a sufficiently specific **Message Contains** condition. Choose **Run Immediately**, or disable **Ask Before Running** on versions that show that setting.
 5. Add **Floosy → Import Bank SMS**. Configure:
