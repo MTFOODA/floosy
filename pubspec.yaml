@@ -2,7 +2,7 @@ name: floosy
 description: "A financial management app for personal expenses and budgeting in Arabic and English."
 publish_to: "none"
 
-version: 1.0.0+5
+version: 1.0.0+6
 
 environment:
   sdk: ">=3.1.0 <4.0.0"
