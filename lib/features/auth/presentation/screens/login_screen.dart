@@ -156,6 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
         context.watch<AppLockCubit>().state.biometricAvailable;
     final biometricBusy = context.watch<AppLockCubit>().state.authenticating;
     final busy = _isLoading || _isGooglePending || biometricBusy;
+    final alternativeButtonStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      foregroundColor: FloosyDesign.brightPurple,
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    );
     return BlocListener<AuthCubit, AuthenticationState>(
         listenWhen: (previous, next) =>
             previous.googlePending &&
@@ -179,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
           body: SafeArea(
             child: SingleChildScrollView(
               padding: FloosyDesign.horizontalPadding(context)
-                  .copyWith(top: 20, bottom: 32),
+                  .copyWith(top: 12, bottom: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -189,10 +196,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       message: l['selectLanguage'],
                       child: SegmentedButton<String>(
                         showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(value: 'ar', label: Text('العربية')),
-                          ButtonSegment(value: 'en', label: Text('English')),
-                        ],
+                        segments: l.isArabic
+                            ? const [
+                                ButtonSegment(
+                                    value: 'ar', label: Text('العربية')),
+                                ButtonSegment(
+                                    value: 'en', label: Text('English')),
+                              ]
+                            : const [
+                                ButtonSegment(
+                                    value: 'en', label: Text('English')),
+                                ButtonSegment(
+                                    value: 'ar', label: Text('العربية')),
+                              ],
                         selected: {l.locale.languageCode},
                         style: SegmentedButton.styleFrom(
                           textStyle: const TextStyle(
@@ -220,16 +236,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   const AuthBrandHeader(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   const AuthModeSwitch(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   if (_errorMessage != null)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
                         color: context.fc.logoutBg,
                         borderRadius:
@@ -270,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: Icons.alternate_email,
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   AuthTextField(
                     controller: _passwordController,
                     hintText: l['enterPassword'],
@@ -282,49 +298,49 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? Icons.visibility_off_rounded
                             : Icons.visibility_rounded,
                         color: context.fc.textMuted,
-                        size: 22,
+                        size: 20,
                       ),
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton(
+                      onPressed: () => context.go(AppRoutes.forgotPassword),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 40),
+                        foregroundColor: FloosyDesign.brightPurple,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: Text(l['forgotPassword']),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   GradientButton(
                     text: l['login'],
                     onPressed: busy ? null : _handleLogin,
                     isLoading: _isLoading,
                   ),
-                  const SizedBox(height: 20),
-                  if (biometricAvailable) ...[
-                    SizedBox(
+                  const SizedBox(height: 12),
+                  SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: busy ? null : _handleBiometricLogin,
-                        icon: biometricBusy
+                        style: alternativeButtonStyle,
+                        onPressed: busy ? null : _handleGoogleLogin,
+                        icon: _isGooglePending
                             ? const SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 18,
+                                height: 18,
                                 child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.fingerprint_rounded),
-                        label: Text(l['loginWithBiometrics']),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  OutlinedButton.icon(
-                    onPressed: busy ? null : _handleGoogleLogin,
-                    icon: _isGooglePending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.account_circle_outlined),
-                    label: Text(l[_isGooglePending
-                        ? 'googleSignInPending'
-                        : 'continueWithGoogle']),
-                  ),
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.account_circle_outlined,
+                                size: 20),
+                        label: Text(l[_isGooglePending
+                            ? 'googleSignInPending'
+                            : 'continueWithGoogle']),
+                      )),
                   if (_isGooglePending)
                     TextButton(
                       onPressed: _isLoading
@@ -332,30 +348,40 @@ class _LoginScreenState extends State<LoginScreen> {
                           : () => context.read<AuthCubit>().cancelGoogle(),
                       child: Text(l['cancel']),
                     ),
-                  const SizedBox(height: 20),
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => context.go(AppRoutes.forgotPassword),
-                      child: Text(
-                        l['forgotPassword'],
-                        style: context.fc.bodyText
-                            .copyWith(color: FloosyDesign.brightPurple),
+                  if (biometricAvailable) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: alternativeButtonStyle,
+                        onPressed: busy ? null : _handleBiometricLogin,
+                        icon: biometricBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.fingerprint_rounded, size: 20),
+                        label: Text(l['loginWithBiometrics']),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
+                  ],
+                  const SizedBox(height: 16),
                   Center(
                     child: Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 4,
                       children: [
-                        Text(l['dontHaveAccount'], style: context.fc.bodyText),
+                        Text(l['dontHaveAccount'],
+                            style: context.fc.bodyText.copyWith(fontSize: 12)),
                         GestureDetector(
                           onTap: () => context.go(AppRoutes.register),
                           child: Text(
                             l['signup'],
                             style: context.fc.bodyText.copyWith(
+                              fontSize: 12,
                               color: FloosyDesign.brightPurple,
                               fontWeight: FontWeight.bold,
                             ),

@@ -13,32 +13,24 @@ class AuthBrandHeader extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 104,
-          height: 104,
+          width: 68,
+          height: 68,
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Image.asset('assets/logo/floosy.png',
-              fit: BoxFit.contain, semanticLabel: 'Floosy'),
-        ),
-        const SizedBox(height: 12),
-        Text('Floosy', style: context.fc.logo),
-        const SizedBox(height: 4),
-        Text(
-          'Floosy | فلوسي',
-          style: TextStyle(
-            fontSize: 14,
-            color: context.fc.textMuted,
-            fontWeight: FontWeight.w400,
-          ),
+          child: Image.asset('assets/logo/floosy_symbol.png',
+              fit: BoxFit.contain, excludeFromSemantics: true),
         ),
         const SizedBox(height: 8),
+        Text(l['appTitle'],
+            style: context.fc.logo.copyWith(fontSize: 40, height: 1.15)),
+        const SizedBox(height: 4),
         Text(
           l['smartFinance'],
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 14,
             color: FloosyDesign.brightPurple,
             fontWeight: FontWeight.w500,
             letterSpacing: 0.5,

@@ -39,7 +39,7 @@ class _GradientButtonState extends State<GradientButton> {
         scale: _isPressed ? 0.97 : 1.0,
         duration: FloosyDesign.fast,
         child: Container(
-          height: widget.height ?? 64,
+          height: widget.height ?? 48,
           width: widget.width ?? double.infinity,
           decoration: BoxDecoration(
             gradient: isDisabled
@@ -78,7 +78,7 @@ class _GradientButtonState extends State<GradientButton> {
                       Text(
                         widget.text,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: context.fc.textPrimary,
                         ),

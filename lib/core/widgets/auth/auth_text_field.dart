@@ -28,20 +28,25 @@ class AuthTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: TextStyle(color: context.fc.textPrimary, fontSize: 16),
+      style: TextStyle(color: context.fc.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: TextStyle(color: context.fc.textMuted, fontSize: 15),
+        hintStyle: TextStyle(color: context.fc.textMuted, fontSize: 13),
         labelText: labelText,
         labelStyle: TextStyle(color: context.fc.textMuted, fontSize: 14),
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: context.fc.textMuted, size: 22)
+            ? Icon(prefixIcon, color: context.fc.textMuted, size: 20)
             : null,
         suffixIcon: suffixIcon,
+        isDense: true,
+        prefixIconConstraints:
+            const BoxConstraints(minWidth: 44, minHeight: 48),
+        suffixIconConstraints:
+            const BoxConstraints(minWidth: 44, minHeight: 48),
         filled: true,
         fillColor: context.fc.inputBackground,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
           borderSide: BorderSide(color: context.fc.inputBorder),

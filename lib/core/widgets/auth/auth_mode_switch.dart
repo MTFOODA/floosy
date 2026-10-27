@@ -30,7 +30,7 @@ class AuthModeSwitch extends StatelessWidget {
                         context.go(mode ? AppRoutes.register : AppRoutes.login),
                 child: AnimatedContainer(
                   duration: FloosyDesign.normal,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                       color: register == mode
                           ? FloosyDesign.primaryPurple
