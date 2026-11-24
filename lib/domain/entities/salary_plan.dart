@@ -4,6 +4,11 @@ import 'transaction_model.dart';
 /// applied to the selected debit-card baseline; later movements remain in the
 /// single existing ledger and are never duplicated here.
 class SalaryPlan {
+  /// The one debit card this income plan belongs to. Salary never leaks to a
+  /// second card just because both cards belong to the same user.
+  final String? cardId;
+  final String? cardLast4;
+  final String? bankName;
   final int monthlySalaryMinor;
   final int cycleStartDay;
   final int startingBalanceMinor;
@@ -11,6 +16,9 @@ class SalaryPlan {
   final DateTime effectiveFrom;
 
   const SalaryPlan({
+    this.cardId,
+    this.cardLast4,
+    this.bankName,
     required this.monthlySalaryMinor,
     required this.cycleStartDay,
     required this.startingBalanceMinor,
@@ -20,6 +28,9 @@ class SalaryPlan {
 
   Map<String, dynamic> toJson(String id) => {
     'id': id,
+    'card_id': cardId,
+    'card_last4': cardLast4,
+    'bank_name': bankName,
     'monthly_salary_minor': monthlySalaryMinor,
     'cycle_start_day': cycleStartDay,
     'starting_balance_minor': startingBalanceMinor,
@@ -28,6 +39,9 @@ class SalaryPlan {
   };
 
   factory SalaryPlan.fromJson(Map<String, dynamic> json) => SalaryPlan(
+    cardId: json['card_id'] as String?,
+    cardLast4: json['card_last4'] as String?,
+    bankName: json['bank_name'] as String?,
     monthlySalaryMinor: (json['monthly_salary_minor'] as num?)?.toInt() ?? 0,
     cycleStartDay: ((json['cycle_start_day'] as num?)?.toInt() ?? 1)
         .clamp(1, 31)

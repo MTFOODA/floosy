@@ -3,6 +3,9 @@ import 'package:floosy/domain/entities/salary_plan.dart';
 
 void main() {
   final plan = SalaryPlan(
+    cardId: 'faisal-debit',
+    cardLast4: '2307',
+    bankName: 'Faisal Islamic Bank',
     monthlySalaryMinor: 1000000,
     cycleStartDay: 25,
     startingBalanceMinor: 1250000,
@@ -38,5 +41,8 @@ void main() {
     expect(restored.cycleStartDay, 25);
     expect(restored.startingBalanceMinor, 1250000);
     expect(restored.autoDetectSalary, isTrue);
+    expect(restored.cardId, 'faisal-debit');
+    expect(restored.cardLast4, '2307');
+    expect(restored.bankName, 'Faisal Islamic Bank');
   });
 }

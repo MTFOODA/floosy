@@ -14,6 +14,8 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
   static const _historyKind = 'salary_plan_history';
   static const _activeId = 'active';
 
+  String _planId(String cardId) => 'card-$cardId';
+
   final PrivateRecordStore _records;
   final TransactionRepository _transactions;
   final SmsMessageLocalDataSource _messages;
@@ -27,9 +29,30 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
   );
 
   @override
-  Future<SalaryPlan?> getPlan(String userId) async {
-    final value = await _records.get(_activeKind, _activeId);
-    return value == null ? null : SalaryPlan.fromJson(value);
+  Future<SalaryPlan?> getPlan(String userId, {required String cardId}) async {
+    final stored = await _records.get(_activeKind, _planId(cardId));
+    if (stored != null) return SalaryPlan.fromJson(stored);
+
+    // One safe migration for the former global plan: the first selected debit
+    // card claims it locally. It is then removed from the global key, so it
+    // can never appear on every card.
+    final legacy = await _records.get(_activeKind, _activeId);
+    if (legacy == null) return null;
+    final plan = SalaryPlan.fromJson(legacy);
+    if (plan.cardId != null && plan.cardId != cardId) return null;
+    final migrated = SalaryPlan(
+      cardId: cardId,
+      cardLast4: plan.cardLast4,
+      bankName: plan.bankName,
+      monthlySalaryMinor: plan.monthlySalaryMinor,
+      cycleStartDay: plan.cycleStartDay,
+      startingBalanceMinor: plan.startingBalanceMinor,
+      autoDetectSalary: plan.autoDetectSalary,
+      effectiveFrom: plan.effectiveFrom,
+    );
+    await _records.put(_activeKind, migrated.toJson(_planId(cardId)));
+    await _records.delete(_activeKind, _activeId);
+    return migrated;
   }
 
   @override
@@ -38,6 +61,9 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
     required int monthlySalaryMinor,
     required int cycleStartDay,
     required int startingBalanceMinor,
+    required String cardId,
+    required String cardLast4,
+    String? bankName,
     bool autoDetectSalary = true,
     DateTime? effectiveFrom,
   }) async {
@@ -47,30 +73,35 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
     final safeDay = cycleStartDay.clamp(1, 31).toInt();
     final base = effectiveFrom ?? _cycleStart(DateTime.now(), safeDay);
     final plan = SalaryPlan(
+      cardId: cardId,
+      cardLast4: cardLast4,
+      bankName: bankName,
       monthlySalaryMinor: monthlySalaryMinor,
       cycleStartDay: safeDay,
       startingBalanceMinor: startingBalanceMinor < 0 ? 0 : startingBalanceMinor,
       autoDetectSalary: autoDetectSalary,
       effectiveFrom: base,
     );
-    final historyId = 'plan-${base.toUtc().millisecondsSinceEpoch}';
+    final historyId =
+        'plan-$cardId-${base.toUtc().millisecondsSinceEpoch}';
     await _records.put(_historyKind, plan.toJson(historyId));
-    await _records.put(_activeKind, plan.toJson(_activeId));
+    await _records.put(_activeKind, plan.toJson(_planId(cardId)));
   }
 
   @override
   Future<SalaryCycleSummary> summaryFor(
     String userId, {
+    required String cardId,
     DateTime? reference,
   }) async {
     final at = reference ?? DateTime.now();
-    final active = await getPlan(userId);
+    final active = await getPlan(userId, cardId: cardId);
     final configuredStart = active == null
         ? null
         : _cycleStart(at, active.cycleStartDay);
     final plan = configuredStart == null
         ? null
-        : await _planForCycle(userId, configuredStart, active!);
+        : await _planForCycle(userId, cardId, configuredStart, active!);
     // Months before the user first configured a plan keep their transaction
     // evidence, but are not retroactively assigned today's salary settings.
     final start = plan == null
@@ -122,6 +153,9 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
     var cashExpenses = 0, cashExpenseMinor = 0;
     var salaryMessages = 0, salaryMessageMinor = 0;
     for (final transaction in transactions) {
+      // Salary and spending analytics are scoped to the configured debit
+      // card. A second account gets no income plan unless the user creates one.
+      if (transaction.cardId != cardId) continue;
       if (transaction.status != TransactionStatus.confirmed) continue;
       if (transaction.type == TransactionType.income &&
           (salaryTransactionIds.contains(transaction.id) ||
@@ -168,6 +202,7 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
 
   Future<SalaryPlan?> _planForCycle(
     String userId,
+    String cardId,
     DateTime cycleStart,
     SalaryPlan active,
   ) async {
@@ -175,7 +210,11 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
     final candidates =
         history
             .map(SalaryPlan.fromJson)
-            .where((plan) => !plan.effectiveFrom.isAfter(cycleStart))
+            .where(
+              (plan) =>
+                  plan.cardId == cardId &&
+                  !plan.effectiveFrom.isAfter(cycleStart),
+            )
             .toList()
           ..sort((a, b) => b.effectiveFrom.compareTo(a.effectiveFrom));
     if (candidates.isNotEmpty) return candidates.first;

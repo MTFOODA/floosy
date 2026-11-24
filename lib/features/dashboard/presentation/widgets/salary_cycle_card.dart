@@ -6,6 +6,7 @@ import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/money_formatter.dart';
 import '../../../../core/widgets/common/finance_panel.dart';
 import '../../../../domain/entities/salary_plan.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 import '../cubit/salary_plan_cubit.dart';
 import 'salary_setup_dialog.dart';
 
@@ -13,11 +14,40 @@ import 'salary_setup_dialog.dart';
 /// same ledger as My Balance and never creates a second movement.
 class SalaryCycleCard extends StatelessWidget {
   final int currentBalanceMinor;
-  const SalaryCycleCard({super.key, required this.currentBalanceMinor});
+  final DetectedCard? selectedCard;
+  const SalaryCycleCard({
+    super.key,
+    required this.currentBalanceMinor,
+    this.selectedCard,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
+    if (selectedCard?.isCreditCard == true) {
+      return FinancePanel(
+        height: 132,
+        colors: const [Color(0xFF173447), Color(0xFF28576A)],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l['salaryDebitOnlyTitle'],
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l['salaryDebitOnlyHint'],
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
     final state = context.watch<SalaryPlanCubit>().state;
     final summary = state.value;
     if (state.isLoading && summary == null) {

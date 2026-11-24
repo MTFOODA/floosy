@@ -102,6 +102,7 @@ class AppRuntime {
   late final salary = SalaryPlanCubit(
     repositories.salary,
     _userId,
+    () => finance.state.map((snapshot) => snapshot.card).value,
     refresh.refresh,
   );
   late final transactions = TransactionCommandsCubit(
@@ -132,6 +133,7 @@ class AppRuntime {
     ),
     repositories.salary,
     _userId,
+    () => finance.state.map((snapshot) => snapshot.card).value,
   );
   final filter = TransactionFilterCubit();
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -144,7 +146,10 @@ class AppRuntime {
   }) {
     _subscriptions.add(auth.stream.listen(_authenticationChanged));
     _subscriptions.add(refresh.stream.listen((_) => reload()));
-    _subscriptions.add(selection.stream.listen((_) => finance.reload()));
+    _subscriptions.add(selection.stream.listen((_) async {
+      await finance.reload();
+      await salary.reload();
+    }));
     _subscriptions.add(
       cards.stream.listen((state) async {
         if (state.isLoading || state.hasError || _userId() == null) return;
@@ -262,16 +267,18 @@ class AppRuntime {
 
   Future<void> reload() async {
     if (_closed || _userId() == null) return;
+    // Salary plans are card-scoped. Refresh the selected-card snapshot before
+    // asking the salary cubit which plan belongs to the current screen.
+    await cards.reload();
     await Future.wait([
-      cards.reload(),
       finance.reload(),
       items.reload(),
       profile.reload(),
       budgets.reload(),
       analytics.reload(),
       cash.reload(),
-      salary.reload(),
     ]);
+    await salary.reload();
   }
 
   Future<void> close() async {

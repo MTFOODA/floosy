@@ -333,4 +333,91 @@ void main() {
       expect((await cursor.read('u')).pagesScanned, 5);
     },
   );
+
+  test(
+    'salary plans and cycle activity stay scoped to one debit card',
+    () async {
+      final client = SupabaseClient('https://floosy.supabase.co', 'test-key');
+      final dependencies = AppDependencies(
+        client: client,
+        database: db.AppDatabase(NativeDatabase.memory()),
+      );
+      dependencies.currentUserId = () => 'u';
+      addTearDown(() async {
+        await dependencies.close();
+        await client.dispose();
+      });
+      final salaryCard = await dependencies.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2307',
+        bankName: 'Faisal Islamic Bank',
+      );
+      final otherCard = await dependencies.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2325',
+        bankName: 'ALEXBANK',
+      );
+      await dependencies.salaryRepository.configure(
+        'u',
+        cardId: salaryCard.id,
+        cardLast4: salaryCard.last4,
+        bankName: salaryCard.bankName,
+        monthlySalaryMinor: 1000000,
+        startingBalanceMinor: 1000000,
+        cycleStartDay: 1,
+        effectiveFrom: DateTime(2026, 11, 1),
+      );
+      Future<void> record(
+        String id,
+        String cardId,
+        String last4,
+        TransactionType type,
+        int amount,
+      ) => dependencies.moneyRepository.recordSmsTransaction(
+        userId: 'u',
+        transaction: Transaction(
+          id: id,
+          userId: 'u',
+          type: type,
+          source: TransactionSource.sms,
+          amountMinor: amount,
+          transactionDate: DateTime.utc(2026, 11, 20),
+          fingerprint: id,
+          cardId: cardId,
+          cardLast4: last4,
+        ),
+      );
+      await record(
+        'faisal-purchase',
+        salaryCard.id,
+        salaryCard.last4,
+        TransactionType.purchase,
+        12500,
+      );
+      await record(
+        'alex-purchase',
+        otherCard.id,
+        otherCard.last4,
+        TransactionType.purchase,
+        50000,
+      );
+
+      final salarySummary = await dependencies.salaryRepository.summaryFor(
+        'u',
+        cardId: salaryCard.id,
+        reference: DateTime(2026, 11, 24),
+      );
+      final otherSummary = await dependencies.salaryRepository.summaryFor(
+        'u',
+        cardId: otherCard.id,
+        reference: DateTime(2026, 11, 24),
+      );
+      expect(salarySummary.plan?.cardId, salaryCard.id);
+      expect(salarySummary.purchaseCount, 1);
+      expect(salarySummary.purchaseMinor, 12500);
+      expect(otherSummary.plan, isNull);
+      expect(otherSummary.purchaseCount, 1);
+      expect(otherSummary.purchaseMinor, 50000);
+    },
+  );
 }

@@ -4,6 +4,7 @@ import '../widgets/bank_mappings_sheet.dart';
 import '../widgets/backup_actions.dart';
 import '../../../dashboard/presentation/widgets/salary_setup_dialog.dart';
 import '../../../dashboard/presentation/cubit/finance_cubit.dart';
+import '../../../dashboard/presentation/cubit/salary_plan_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'ios_bank_messages_screen.dart';
@@ -262,17 +263,20 @@ class SettingsScreen extends StatelessWidget {
           _SettingsRow(
             icon: Icons.payments_outlined,
             label: l['salaryCycle'],
-            onTap: () => showSalarySetupDialog(
-              context,
-              currentBalanceMinor:
-                  context
-                      .read<FinanceCubit>()
-                      .state
-                      .value
-                      ?.summary
-                      .myBalanceMinor ??
-                  0,
-            ),
+            onTap: () {
+              final finance = context.read<FinanceCubit>().state.value;
+              if (finance?.card?.isCreditCard == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l['salaryCreditNotAllowed'])),
+                );
+                return;
+              }
+              showSalarySetupDialog(
+                context,
+                currentBalanceMinor: finance?.summary.myBalanceMinor ?? 0,
+                existing: context.read<SalaryPlanCubit>().state.value?.plan,
+              );
+            },
           ),
           Divider(height: 1, color: context.fc.borderSubtle),
           _SettingsRow(

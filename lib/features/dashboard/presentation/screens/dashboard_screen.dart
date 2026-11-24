@@ -101,9 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Card-specific money figures: when a detected card is selected, My
     // Balance, Pocket Cash and Deducted Money show THAT CARD's values only
     // (scoped by card_last4). No selection Ã¢â€ â€™ explicit zeros.
-    final summaryAsync = context.watch<FinanceCubit>().state.map(
-      (data) => data.summary,
-    );
+    final financeAsync = context.watch<FinanceCubit>().state;
+    final summaryAsync = financeAsync.map((data) => data.summary);
     final salaryState = context.watch<SalaryPlanCubit>().state;
     // Surface provider failures during development instead of silently
     // rendering zeros Ã¢â‚¬â€ zero must mean "calculated zero", not "error".
@@ -161,6 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
                 SalaryCycleCard(
                   currentBalanceMinor: summaryAsync.value?.myBalanceMinor ?? 0,
+                  selectedCard: financeAsync.value?.card,
                 ),
                 const SizedBox(height: 20),
                 _buildSummaryCards(summaryAsync, l),

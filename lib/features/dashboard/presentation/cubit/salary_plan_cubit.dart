@@ -1,13 +1,20 @@
 import '../../../../core/state/async_cubit.dart';
 import '../../../../domain/entities/salary_plan.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 import '../../../../domain/repositories/salary_plan_repository.dart';
 
 class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
   final SalaryPlanRepository _repository;
   final String? Function() _userId;
+  final DetectedCard? Function() _selectedCard;
   final void Function() _onChanged;
 
-  SalaryPlanCubit(this._repository, this._userId, this._onChanged);
+  SalaryPlanCubit(
+    this._repository,
+    this._userId,
+    this._selectedCard,
+    this._onChanged,
+  );
 
   Future<void> reload({DateTime? reference}) {
     final userId = _userId();
@@ -15,7 +22,18 @@ class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
       clear(empty());
       return Future.value();
     }
-    return load(() => _repository.summaryFor(userId, reference: reference));
+    final card = _selectedCard();
+    if (card == null || card.isCreditCard) {
+      clear(empty());
+      return Future.value();
+    }
+    return load(
+      () => _repository.summaryFor(
+        userId,
+        cardId: card.id,
+        reference: reference,
+      ),
+    );
   }
 
   Future<void> configure({
@@ -26,11 +44,18 @@ class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
   }) async {
     final userId = _userId();
     if (userId == null) throw StateError('Sign in first');
+    final card = _selectedCard();
+    if (card == null || card.isCreditCard) {
+      throw StateError('Salary plans require a debit card');
+    }
     await _repository.configure(
       userId,
       monthlySalaryMinor: monthlySalaryMinor,
       cycleStartDay: cycleStartDay,
       startingBalanceMinor: startingBalanceMinor,
+      cardId: card.id,
+      cardLast4: card.last4,
+      bankName: card.bankName,
       autoDetectSalary: autoDetectSalary,
     );
     await reload();

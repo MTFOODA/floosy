@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/money_formatter.dart';
 import '../../../../domain/entities/salary_plan.dart';
+import '../../../../domain/entities/detected_card_model.dart';
 import '../../../../domain/repositories/salary_plan_repository.dart';
 import '../../../../domain/usecases/get_financial_overview.dart';
 
@@ -21,9 +22,10 @@ class AIChatCubit extends Cubit<FinancialChatState> {
   final GetFinancialOverview _overview;
   final SalaryPlanRepository _salary;
   final String? Function() _userId;
+  final DetectedCard? Function() _selectedCard;
   int _generation = 0;
 
-  AIChatCubit(this._overview, this._salary, this._userId)
+  AIChatCubit(this._overview, this._salary, this._userId, this._selectedCard)
     : super(const FinancialChatState());
 
   void greet(String text) {
@@ -61,10 +63,15 @@ class AIChatCubit extends Cubit<FinancialChatState> {
     String reply;
     try {
       final facts = await _overview(userId);
-      final cycle = await _salary.summaryFor(
-        userId,
-        reference: _monthInQuestion(text) ?? DateTime.now(),
-      );
+      final reference = _monthInQuestion(text) ?? DateTime.now();
+      final card = _selectedCard();
+      final cycle = card == null || card.isCreditCard
+          ? _emptyCycle(reference)
+          : await _salary.summaryFor(
+              userId,
+              cardId: card.id,
+              reference: reference,
+            );
       reply = _answer(text, facts, cycle, arabic);
     } catch (_) {
       reply = errorText;
@@ -79,6 +86,12 @@ class AIChatCubit extends Cubit<FinancialChatState> {
       ),
     );
   }
+
+  SalaryCycleSummary _emptyCycle(DateTime reference) => SalaryCycleSummary(
+    plan: null,
+    start: DateTime(reference.year, reference.month, 1),
+    endExclusive: DateTime(reference.year, reference.month + 1, 1),
+  );
 
   String _answer(
     String question,
