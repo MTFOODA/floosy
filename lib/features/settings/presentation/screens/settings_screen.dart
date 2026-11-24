@@ -246,6 +246,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildAccountCard(BuildContext context, AppLocalizations l) {
+    final finance = context.watch<FinanceCubit>().state.value;
+    final canConfigureSalary = finance?.card?.isCreditCard != true;
     return Container(
       decoration: BoxDecoration(
         color: context.fc.primarySurface,
@@ -260,25 +262,18 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _showBankMappingsSheet(context, l),
           ),
           Divider(height: 1, color: context.fc.borderSubtle),
-          _SettingsRow(
-            icon: Icons.payments_outlined,
-            label: l['salaryCycle'],
-            onTap: () {
-              final finance = context.read<FinanceCubit>().state.value;
-              if (finance?.card?.isCreditCard == true) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l['salaryCreditNotAllowed'])),
-                );
-                return;
-              }
-              showSalarySetupDialog(
+          if (canConfigureSalary) ...[
+            _SettingsRow(
+              icon: Icons.payments_outlined,
+              label: l['salaryCycle'],
+              onTap: () => showSalarySetupDialog(
                 context,
                 currentBalanceMinor: finance?.summary.myBalanceMinor ?? 0,
                 existing: context.read<SalaryPlanCubit>().state.value?.plan,
-              );
-            },
-          ),
-          Divider(height: 1, color: context.fc.borderSubtle),
+              ),
+            ),
+            Divider(height: 1, color: context.fc.borderSubtle),
+          ],
           _SettingsRow(
             icon: Icons.lock_outline_rounded,
             label: l['changePassword'],

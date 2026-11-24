@@ -157,12 +157,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const DetectedCardsSection(),
                 const SizedBox(height: 20),
                 _buildBalanceCard(summaryAsync, l),
-                const SizedBox(height: 20),
-                SalaryCycleCard(
-                  currentBalanceMinor: summaryAsync.value?.myBalanceMinor ?? 0,
-                  selectedCard: financeAsync.value?.card,
-                ),
-                const SizedBox(height: 20),
+                if (financeAsync.value?.card?.isCreditCard != true) ...[
+                  const SizedBox(height: 20),
+                  SalaryCycleCard(
+                    currentBalanceMinor:
+                        summaryAsync.value?.myBalanceMinor ?? 0,
+                    selectedCard: financeAsync.value?.card,
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 _buildSummaryCards(summaryAsync, l),
                 const SizedBox(height: 24),
                 _buildItemsSection(itemsAsync, l),

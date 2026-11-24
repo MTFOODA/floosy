@@ -25,28 +25,9 @@ class SalaryCycleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
     if (selectedCard?.isCreditCard == true) {
-      return FinancePanel(
-        height: 132,
-        colors: const [Color(0xFF173447), Color(0xFF28576A)],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l['salaryDebitOnlyTitle'],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l['salaryDebitOnlyHint'],
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ],
-        ),
-      );
+      // Salary is a debit-account feature, not an unavailable credit-card
+      // action. Keep the dashboard focused by not rendering the section.
+      return const SizedBox.shrink();
     }
     final state = context.watch<SalaryPlanCubit>().state;
     final summary = state.value;
