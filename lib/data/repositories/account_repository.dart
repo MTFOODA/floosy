@@ -10,10 +10,13 @@ class SupabaseAccountRepository implements AccountRepository {
 
   static AccountSession? mapSession(Session? session) => session == null
       ? null
-      : AccountSession(AccountUser(
-          id: session.user.id,
-          email: session.user.email,
-          userMetadata: Map.unmodifiable(session.user.userMetadata ?? {})));
+      : AccountSession(
+          AccountUser(
+            id: session.user.id,
+            email: session.user.email,
+            userMetadata: Map.unmodifiable(session.user.userMetadata ?? {}),
+          ),
+        );
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
@@ -27,11 +30,14 @@ class SupabaseAccountRepository implements AccountRepository {
   AccountSession? get session => mapSession(_source.getCurrentSession());
   @override
   Stream<AccountUpdate> get changes => _source
-          .getAuthStateChanges()
-          .map((event) => AccountUpdate(
-              AccountEvent.values.byName(event.event.name),
-              mapSession(event.session)))
-          .handleError((Object error) {
+      .getAuthStateChanges()
+      .map(
+        (event) => AccountUpdate(
+          AccountEvent.values.byName(event.event.name),
+          mapSession(event.session),
+        ),
+      )
+      .handleError((Object error) {
         if (error is AuthException) {
           throw AuthenticationFailure(error.message, code: error.code);
         }
@@ -43,14 +49,13 @@ class SupabaseAccountRepository implements AccountRepository {
         await _source.signIn(email: email, password: password);
       });
   @override
-  Future<void> signUp(
-          {required String email,
-          required String password,
-          String? fullName}) =>
-      _guard(() async {
-        await _source.signUp(
-            email: email, password: password, fullName: fullName);
-      });
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? fullName,
+  }) => _guard(() async {
+    await _source.signUp(email: email, password: password, fullName: fullName);
+  });
   @override
   Future<bool> signInWithGoogle() => _guard(_source.signInWithGoogle);
   @override
@@ -58,6 +63,16 @@ class SupabaseAccountRepository implements AccountRepository {
   @override
   Future<void> resetPassword({required String email}) =>
       _guard(() => _source.resetPassword(email: email));
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _guard(
+    () => _source.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    ),
+  );
   @override
   Future<void> resendConfirmationEmail({required String email}) =>
       _guard(() => _source.resendConfirmationEmail(email: email));

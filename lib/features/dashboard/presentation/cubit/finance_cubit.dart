@@ -95,6 +95,21 @@ class FinanceCubit extends AsyncCubit<FinanceSnapshot> {
     _onChanged();
   }
 
+  Future<void> setCurrentBalanceForCard({
+    required String userId,
+    required String cardLast4,
+    required int targetBalanceMinor,
+    String? bankName,
+  }) async {
+    await _repository.setCurrentBalanceForCard(
+      userId: userId,
+      cardLast4: cardLast4,
+      targetBalanceMinor: targetBalanceMinor,
+      bankName: bankName,
+    );
+    _onChanged();
+  }
+
   Future<int?> getMaxAddableForCard(
     String userId,
     String cardLast4, {

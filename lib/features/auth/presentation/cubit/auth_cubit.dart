@@ -10,7 +10,8 @@ enum AuthenticationAction {
   registration,
   signOut,
   passwordReset,
-  resend
+  passwordChange,
+  resend,
 }
 
 class AuthenticationState {
@@ -19,12 +20,13 @@ class AuthenticationState {
   final Object? error;
   final AuthenticationAction action;
   final bool googlePending;
-  const AuthenticationState(
-      {this.session,
-      this.event,
-      this.error,
-      this.action = AuthenticationAction.idle,
-      this.googlePending = false});
+  const AuthenticationState({
+    this.session,
+    this.event,
+    this.error,
+    this.action = AuthenticationAction.idle,
+    this.googlePending = false,
+  });
   AccountUser? get user => session?.user;
   String? get userId => user?.id;
   bool get working => action != AuthenticationAction.idle;
@@ -36,33 +38,45 @@ class AuthCubit extends Cubit<AuthenticationState> {
   late final StreamSubscription<AccountUpdate> _subscription;
   int _operation = 0;
   AuthCubit(this._repository)
-      : super(AuthenticationState(session: _repository.session)) {
-    _subscription = _repository.changes.listen((update) {
-      final complete = update.event == AccountEvent.signedIn ||
-          update.event == AccountEvent.signedOut;
-      if (complete) _operation++;
-      emit(AuthenticationState(
-          session: update.session,
-          event: update.event,
-          action: complete ? AuthenticationAction.idle : state.action,
-          googlePending: complete ? false : state.googlePending));
-    }, onError: (Object error, StackTrace stack) {
-      _operation++;
-      // An error must never replay an earlier signedIn event to the app lock.
-      emit(AuthenticationState(session: state.session, error: error));
-    });
+    : super(AuthenticationState(session: _repository.session)) {
+    _subscription = _repository.changes.listen(
+      (update) {
+        final complete =
+            update.event == AccountEvent.signedIn ||
+            update.event == AccountEvent.signedOut;
+        if (complete) _operation++;
+        emit(
+          AuthenticationState(
+            session: update.session,
+            event: update.event,
+            action: complete ? AuthenticationAction.idle : state.action,
+            googlePending: complete ? false : state.googlePending,
+          ),
+        );
+      },
+      onError: (Object error, StackTrace stack) {
+        _operation++;
+        // An error must never replay an earlier signedIn event to the app lock.
+        emit(AuthenticationState(session: state.session, error: error));
+      },
+    );
   }
   void _action(AuthenticationAction action, {bool? googlePending}) {
     if (isClosed) return;
     // Only SDK events carry AccountEvent.signedIn, never operation updates.
-    emit(AuthenticationState(
+    emit(
+      AuthenticationState(
         session: state.session,
         action: action,
-        googlePending: googlePending ?? state.googlePending));
+        googlePending: googlePending ?? state.googlePending,
+      ),
+    );
   }
 
   Future<T> _run<T>(
-      AuthenticationAction action, Future<T> Function() execute) async {
+    AuthenticationAction action,
+    Future<T> Function() execute,
+  ) async {
     if (state.working || state.googlePending) {
       throw StateError('Authentication is already pending');
     }
@@ -78,16 +92,22 @@ class AuthCubit extends Cubit<AuthenticationState> {
   }
 
   Future<void> signIn({required String email, required String password}) =>
-      _run(AuthenticationAction.password,
-          () => _repository.signIn(email: email, password: password));
-  Future<void> signUp(
-          {required String email,
-          required String password,
-          String? fullName}) =>
       _run(
-          AuthenticationAction.registration,
-          () => _repository.signUp(
-              email: email, password: password, fullName: fullName));
+        AuthenticationAction.password,
+        () => _repository.signIn(email: email, password: password),
+      );
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? fullName,
+  }) => _run(
+    AuthenticationAction.registration,
+    () => _repository.signUp(
+      email: email,
+      password: password,
+      fullName: fullName,
+    ),
+  );
   Future<bool> signInWithGoogle() async {
     if (state.working || state.googlePending) return false;
     final operation = ++_operation;
@@ -127,11 +147,23 @@ class AuthCubit extends Cubit<AuthenticationState> {
   }
 
   Future<void> resetPassword({required String email}) => _run(
-      AuthenticationAction.passwordReset,
-      () => _repository.resetPassword(email: email));
+    AuthenticationAction.passwordReset,
+    () => _repository.resetPassword(email: email),
+  );
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _run(
+    AuthenticationAction.passwordChange,
+    () => _repository.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    ),
+  );
   Future<void> resendConfirmationEmail({required String email}) => _run(
-      AuthenticationAction.resend,
-      () => _repository.resendConfirmationEmail(email: email));
+    AuthenticationAction.resend,
+    () => _repository.resendConfirmationEmail(email: email),
+  );
   @override
   Future<void> close() async {
     _operation++;

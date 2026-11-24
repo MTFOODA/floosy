@@ -24,8 +24,8 @@ class SmsCubit extends AsyncCubit<SmsIngestionResult> {
       _imports.addMessage(sender, body, date);
   Future<void> retryImportedMessage(String id) => _imports.retryMessage(id);
   Future<void> discardImportedMessage(String id) => _imports.discardMessage(id);
-  Future<SmsIngestionResult> scanNow() async {
-    final result = await _repository.scanNow();
+  Future<SmsIngestionResult> scanNow({bool fullScan = false}) async {
+    final result = await _repository.scanNow(fullScan: fullScan);
     if (!isClosed) emit(LoadState.data(result));
     return result;
   }

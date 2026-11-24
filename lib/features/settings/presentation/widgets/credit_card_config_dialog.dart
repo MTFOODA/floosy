@@ -128,8 +128,7 @@ class _CreditCardConfigDialogState extends State<CreditCardConfigDialog> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: l['creditLimitAmount'],
-                  prefixText: 'EGP ',
-                  suffixText: 'EGP',
+                  suffixText: l.currencySymbol('EGP'),
                   helperText: l['creditLimitHelp'],
                 ),
               ),

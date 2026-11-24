@@ -1,0 +1,464 @@
+{
+  "reviewed_on": "2026-11-21",
+  "production_remediation_applied": true,
+  "migration_history_recorded": true,
+  "before": {
+    "results": [
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.calculate_savings_opportunity(user_id_param uuid, item_id_param uuid, reduction_percentage_param numeric)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/calculate_savings_opportunity`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "calculate_savings_opportunity",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_calculate_savings_opportunity_user_id_param uuid, item_id_param uuid, reduction_percentage_param numeric"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_bank_accounts_with_balance(user_id_param uuid)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_bank_accounts_with_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_bank_accounts_with_balance",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_bank_accounts_with_balance_user_id_param uuid"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_cash_balance(user_id_param uuid)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_cash_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_cash_balance",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_cash_balance_user_id_param uuid"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_deducted_money(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_deducted_money`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_deducted_money",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_deducted_money_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_item_usage_stats(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_item_usage_stats`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_item_usage_stats",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_item_usage_stats_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_monthly_spending(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_monthly_spending`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_monthly_spending",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_monthly_spending_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.get_total_bank_balance(user_id_param uuid)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_total_bank_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "get_total_bank_balance",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_get_total_bank_balance_user_id_param uuid"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.handle_new_user()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/handle_new_user`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "handle_new_user",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_handle_new_user_"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.log_audit_event()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/log_audit_event`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "log_audit_event",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_log_audit_event_"
+      },
+      {
+        "name": "anon_security_definer_function_executable",
+        "title": "Public Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+        "detail": "Function `public.rls_auto_enable()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/rls_auto_enable`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "metadata": {
+          "name": "rls_auto_enable",
+          "schema": "public"
+        },
+        "cacheKey": "anon_security_definer_function_executable_public_rls_auto_enable_"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.calculate_savings_opportunity(user_id_param uuid, item_id_param uuid, reduction_percentage_param numeric)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/calculate_savings_opportunity`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "calculate_savings_opportunity",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_calculate_savings_opportunity_user_id_param uuid, item_id_param uuid, reduction_percentage_param numeric"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_bank_accounts_with_balance(user_id_param uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_bank_accounts_with_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_bank_accounts_with_balance",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_bank_accounts_with_balance_user_id_param uuid"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_cash_balance(user_id_param uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_cash_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_cash_balance",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_cash_balance_user_id_param uuid"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_deducted_money(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_deducted_money`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_deducted_money",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_deducted_money_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_item_usage_stats(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_item_usage_stats`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_item_usage_stats",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_item_usage_stats_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_monthly_spending(user_id_param uuid, year_param smallint, month_param smallint)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_monthly_spending`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_monthly_spending",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_monthly_spending_user_id_param uuid, year_param smallint, month_param smallint"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.get_total_bank_balance(user_id_param uuid)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/get_total_bank_balance`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "get_total_bank_balance",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_get_total_bank_balance_user_id_param uuid"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.handle_new_user()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/handle_new_user`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "handle_new_user",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_handle_new_user_"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.log_audit_event()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/log_audit_event`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "log_audit_event",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_log_audit_event_"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+        "detail": "Function `public.rls_auto_enable()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/rls_auto_enable`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+        "metadata": {
+          "name": "rls_auto_enable",
+          "schema": "public"
+        },
+        "cacheKey": "authenticated_security_definer_function_executable_public_rls_auto_enable_"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "title": "Leaked Password Protection Disabled",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Leaked password protection is currently disabled.",
+        "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "metadata": {
+          "entity": "Auth",
+          "type": "auth"
+        },
+        "cacheKey": "auth_leaked_password_protection"
+      }
+    ],
+    "message": "db advisors",
+    "target": {
+      "kind": "linked",
+      "project_ref": "nyynpeancrulycunizzs",
+      "project_name": "floosy's Project",
+      "environment": "production"
+    }
+  },
+  "after": {
+    "results": [
+      {
+        "name": "auth_leaked_password_protection",
+        "title": "Leaked Password Protection Disabled",
+        "level": "WARN",
+        "facing": "EXTERNAL",
+        "categories": [
+          "SECURITY"
+        ],
+        "description": "Leaked password protection is currently disabled.",
+        "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "metadata": {
+          "entity": "Auth",
+          "type": "auth"
+        },
+        "cacheKey": "auth_leaked_password_protection"
+      }
+    ],
+    "message": "db advisors",
+    "target": {
+      "kind": "linked",
+      "project_ref": "nyynpeancrulycunizzs",
+      "project_name": "floosy's Project",
+      "environment": "production"
+    }
+  },
+  "production_verification": {
+    "auth_trigger_bound": true,
+    "automatic_cloud_wallet_disabled": true,
+    "function_access": [
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.calculate_savings_opportunity(uuid,uuid,numeric)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_bank_accounts_with_balance(uuid)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_cash_balance(uuid)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_deducted_money(uuid,smallint,smallint)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_item_usage_stats(uuid,smallint,smallint)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_monthly_spending(uuid,smallint,smallint)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.get_total_bank_balance(uuid)"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.handle_new_user()"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.log_audit_event()"
+      },
+      {
+        "anon": false,
+        "authenticated": false,
+        "function": "public.rls_auto_enable()"
+      }
+    ],
+    "profile_insert_preserved": true
+  },
+  "authorized_test_data_reset": {
+    "date": "2026-11-21",
+    "removed_rows": 248,
+    "auth_users_retained": 5,
+    "profiles_retained": 5
+  }
+}

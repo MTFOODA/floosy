@@ -10,7 +10,7 @@ DateTime _dateTimeFromJsonRequired(dynamic value) =>
     DateTime.parse(value.toString()).toUtc();
 
 @freezed
-class Item with _$Item {
+abstract class Item with _$Item {
   const factory Item({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -34,7 +34,7 @@ class Item with _$Item {
 }
 
 @freezed
-class ItemPriceHistory with _$ItemPriceHistory {
+abstract class ItemPriceHistory with _$ItemPriceHistory {
   const factory ItemPriceHistory({
     required String id,
     @JsonKey(name: 'item_id') required String itemId,
@@ -52,7 +52,7 @@ class ItemPriceHistory with _$ItemPriceHistory {
 }
 
 @freezed
-class Category with _$Category {
+abstract class Category with _$Category {
   const factory Category({
     required String id,
     @JsonKey(name: 'user_id') String? userId,
@@ -74,7 +74,7 @@ class Category with _$Category {
 }
 
 @freezed
-class Merchant with _$Merchant {
+abstract class Merchant with _$Merchant {
   const factory Merchant({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -93,7 +93,7 @@ class Merchant with _$Merchant {
 }
 
 @freezed
-class CashWallet with _$CashWallet {
+abstract class CashWallet with _$CashWallet {
   const factory CashWallet({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -109,7 +109,7 @@ class CashWallet with _$CashWallet {
 }
 
 @freezed
-class CashMovement with _$CashMovement {
+abstract class CashMovement with _$CashMovement {
   const factory CashMovement({
     required String id,
     @JsonKey(name: 'user_id') required String userId,

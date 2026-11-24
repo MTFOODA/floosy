@@ -12,8 +12,8 @@ flowchart TD
   U --> R
   U --> E[Domain: Entities and Rules]
   D[Data: Repository Implementations] -. implements .-> R
-  D --> L[Drift / SharedPreferences / Native services]
-  D --> S[Supabase Auth / Database / Storage]
+  D --> L[Encrypted Drift / Device key store / Native services]
+  D --> S[Supabase Auth / Profiles / Reference catalog]
   A[App: Composition Root] --> D
   A --> C
 ```
@@ -38,7 +38,7 @@ lib/
     repositories/                # Contract implementations
     local/                       # Drift database and local data sources
     remote/                      # Supabase data sources
-    services/                    # SMS ingestion, synchronization, image upload
+    services/                    # SMS ingestion, verified legacy import, local images
   features/<feature>/presentation/
     cubit/                       # Feature state and commands
     screens/                     # Feature UI
@@ -123,7 +123,10 @@ flutter test
 flutter build apk --debug --no-pub --target-platform android-arm64
 ```
 
-`architecture_boundaries_test.dart` guards Domain's dependency direction and rejects Data/SDK/App imports from Presentation. Coordination tests cover account changes during reads, retained refresh values, biometric access, and visual card changes without financial recalculation. Financial/SMS regressions continue to exercise real in-memory Drift databases.
+The tests in `test/` cover the encrypted vault, financial migration, production
+composition without financial HTTP, account changes during preparation, Arabic
+layout, card appearance, sender rejection and passwords. Financial regressions
+exercise real in-memory Drift databases; file encryption tests use SQLite3MC.
 
 After changing Freezed entities or Drift definitions:
 
@@ -131,4 +134,13 @@ After changing Freezed entities or Drift definitions:
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-Freezed/JSON generated files now live beside their entities in `domain/entities`. This architecture migration does not require recreating user data or changing the database schema.
+Freezed/JSON generated files live beside their entities in `domain/entities`.
+The encrypted local-first update uses schema version 6. The active vault is
+generation v2 after the owner-authorized test-data reset in release 1.0.1+7;
+startup initializes locally and does not invoke the historical cloud importer.
+Financial adapters are bound to local
+storage in `composition_root.dart`; their legacy `RemoteDataSource` base types
+are transitional contracts, not active network synchronization. Normal Supabase
+traffic has a default-deny financial boundary. See
+[the local-first rollout and validation details](local-first-migration.md),
+including production changes awaiting approval and platform limits.

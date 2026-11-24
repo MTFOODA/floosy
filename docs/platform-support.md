@@ -1,74 +1,31 @@
-# Floosy Platform Support Matrix
+# Floosy platform support
 
-| Feature | Android | iOS | Web | Windows | macOS | Linux |
-|---|---|---|---|---|---|---|
-| Authentication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Supabase | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Transactions | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Pocket Cash | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Quick Items | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Budgets | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Recurring Expenses | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Analytics | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Reports | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Alerts & Badges | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| AI Chat | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Direct SMS Inbox Tracking | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Manual Transactions | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Offline Local DB | ✅ | ✅ | ✅¹ | ✅ | ✅ | ✅ |
-| Notifications | ✅ | ✅ | Limited² | Appropriate | Appropriate | Appropriate |
-| Biometric Lock | ✅ | ✅ | ❌ | ❌ | ✅³ | ❌ |
-| RTL / Arabic | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+The encrypted local-first update replaces the previous plaintext financial
+cache. Implementation support and successful native-device validation are
+different: see [the rollout and test limits](local-first-migration.md).
 
-**Notes:**
-¹ Web uses IndexedDB via Drift web adapter — works in modern browsers.
-² Web notifications depend on browser Push API support and user permission.
-³ macOS supports Touch ID / Face ID via `local_auth`.
+| Capability | Android | iOS | Windows | macOS and Linux | Web |
+| --- | --- | --- | --- | --- | --- |
+| Auth and profile | Implemented | Implemented | Implemented | Implemented | Implemented |
+| Encrypted financial vault | Implemented | Implemented, device tests pending | Implemented | Native adapters, build tests pending | Disabled; native app required |
+| Local transactions, cards, Items and analytics | Implemented | Implemented | Implemented | Native adapters | Disabled |
+| Direct SMS inbox scan | Implemented; permission required | Unavailable | Unavailable | Unavailable | Unavailable |
+| Bank message import | Inbox scan | Shortcuts App Intent on iOS 16+, copied messages | Manual entry | Manual entry | Unavailable |
+| Password-encrypted backup and restore | Future | Future | Future | Future | Unavailable |
 
-## Platform-Specific Implementation
+The web financial gate fails closed and explains that the native app is
+required. It no longer writes financial data to plaintext IndexedDB. Logging
+into a native app does not transfer another device's local-only history.
 
-### Android
-- Real SMS reading via platform abstraction (`SmsParserService`)
-- Runtime permissions for SMS, contacts, notifications
-- Material 3 design, supports phone/tablet/desktop (Chromebook)
+Native builds use cipher-enabled SQLite assets and secure platform key storage.
+Android disables automatic cloud backup and device transfer. iOS has device-only
+keychain keys, a protected vault directory excluded from backup and an encrypted
+App Intent queue. These iOS changes need an Xcode build and real locked/unlocked
+iPhone validation; Windows cannot provide that validation.
 
-### iOS
-- No direct access to the SMS inbox or historical SMS
-- iOS 16+ App Intent for user-configured Shortcuts bank message import; queued messages are processed while Floosy is open
-- Manual transaction entry and copied-message import
-- See [iPhone bank message setup and validation limits](ios-bank-messages.md)
-- `local_auth` for biometric lock (Face ID / Touch ID)
+For this update, use the commands and actual outcomes in
+[the local-first migration report](local-first-migration.md). Older documentation
+claiming successful Web or Linux builds does not verify this version. There was
+no attached Android phone or emulator during development of this update.
 
-### Web
-- No SMS access
-- Supabase auth with redirect flow
-- Drift web adapter (IndexedDB)
-- Responsive layout with navigation rail on wide screens
-
-### Windows / macOS / Linux
-- Desktop window management
-- No SMS access
-- Manual transaction entry
-- Keyboard shortcuts and accessibility
-
-## Build Status (Verified in Current Environment)
-
-| Platform | Build Command | Status |
-|---|---|---|
-| Android | `flutter build apk --debug` | ✅ PASS |
-| Web | `flutter build web` | ✅ PASS |
-| Windows | `flutter build windows` | ✅ PASS |
-| Linux | `flutter build linux` | ✅ PASS |
-| iOS | `flutter build ios --no-codesign` | ⚠️ NOT TESTABLE (requires macOS/Xcode) |
-| macOS | `flutter build macos` | ⚠️ NOT TESTABLE (requires macOS/Xcode) |
-
-## Minimum SDK Versions
-
-| Platform | Minimum | Target |
-|---|---|---|
-| Android | API 21 (Android 5.0) | API 36 (Android 16) |
-| iOS | 13.0 (bank message App Intent: 16.0+) | Latest |
-| Web | Modern browsers (ES2017+) | — |
-| Windows | Windows 10 (1809+) | Windows 11 |
-| macOS | 10.15 (Catalina) | Latest |
-| Linux | Ubuntu 20.04+ / equivalent | — |
+See [iPhone message setup](ios-bank-messages.md) for platform restrictions.

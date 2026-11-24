@@ -1,0 +1,2512 @@
+{
+  "foreign_keys": [
+    {
+      "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "profiles",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (default_bank_id) REFERENCES banks(id) ON DELETE SET NULL",
+      "table": "profiles",
+      "target": "banks"
+    },
+    {
+      "definition": "FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE CASCADE",
+      "table": "bank_sms_patterns",
+      "target": "banks"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "categories",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "categories",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "merchants",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "merchants",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "items",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "items",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE",
+      "table": "item_price_history",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "cash_wallets",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "cash_movements",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (wallet_id) REFERENCES cash_wallets(id) ON DELETE CASCADE",
+      "table": "cash_movements",
+      "target": "cash_wallets"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "detected_cards",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "transactions",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE SET NULL",
+      "table": "transactions",
+      "target": "banks"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "transactions",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE SET NULL",
+      "table": "transactions",
+      "target": "merchants"
+    },
+    {
+      "definition": "FOREIGN KEY (card_id) REFERENCES detected_cards(id) ON DELETE SET NULL",
+      "table": "transactions",
+      "target": "detected_cards"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "sms_messages",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (detected_bank_id) REFERENCES banks(id) ON DELETE SET NULL",
+      "table": "sms_messages",
+      "target": "banks"
+    },
+    {
+      "definition": "FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL",
+      "table": "sms_messages",
+      "target": "transactions"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "monthly_incomes",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "user_bank_accounts",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE SET NULL",
+      "table": "user_bank_accounts",
+      "target": "banks"
+    },
+    {
+      "definition": "FOREIGN KEY (account_id) REFERENCES user_bank_accounts(id) ON DELETE CASCADE",
+      "table": "user_bank_movements",
+      "target": "user_bank_accounts"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "user_bank_movements",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (bank_account_id) REFERENCES user_bank_accounts(id) ON DELETE SET NULL",
+      "table": "monthly_incomes",
+      "target": "user_bank_accounts"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "expenses",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL",
+      "table": "expenses",
+      "target": "transactions"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "expenses",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE SET NULL",
+      "table": "expenses",
+      "target": "merchants"
+    },
+    {
+      "definition": "FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE",
+      "table": "expense_items",
+      "target": "expenses"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE",
+      "table": "expense_items",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "item_usage",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE",
+      "table": "item_usage",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE",
+      "table": "item_usage",
+      "target": "expenses"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "budgets",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE",
+      "table": "budget_categories",
+      "target": "budgets"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+      "table": "budget_categories",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "recurring_expenses",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "recurring_expenses",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "recurring_expense_occurrences",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (recurring_expense_id) REFERENCES recurring_expenses(id) ON DELETE CASCADE",
+      "table": "recurring_expense_occurrences",
+      "target": "recurring_expenses"
+    },
+    {
+      "definition": "FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL",
+      "table": "recurring_expense_occurrences",
+      "target": "transactions"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "saving_goals",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "saving_recommendations",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE",
+      "table": "saving_recommendations",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+      "table": "saving_recommendations",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "alerts",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL",
+      "table": "alerts",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "alerts",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "notifications",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "monthly_reports",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (top_category_id) REFERENCES categories(id) ON DELETE SET NULL",
+      "table": "monthly_reports",
+      "target": "categories"
+    },
+    {
+      "definition": "FOREIGN KEY (top_item_id) REFERENCES items(id) ON DELETE SET NULL",
+      "table": "monthly_reports",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (top_merchant_id) REFERENCES merchants(id) ON DELETE SET NULL",
+      "table": "monthly_reports",
+      "target": "merchants"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "monthly_item_statistics",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE",
+      "table": "monthly_item_statistics",
+      "target": "items"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "user_badges",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (badge_id) REFERENCES badges(id) ON DELETE CASCADE",
+      "table": "user_badges",
+      "target": "badges"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+      "table": "audit_logs",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "ai_conversations",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE",
+      "table": "ai_messages",
+      "target": "ai_conversations"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "ai_messages",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "ai_actions",
+      "target": "auth.users"
+    },
+    {
+      "definition": "FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE",
+      "table": "ai_actions",
+      "target": "ai_conversations"
+    },
+    {
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+      "table": "sync_queue",
+      "target": "auth.users"
+    }
+  ],
+  "functions": [
+    {
+      "name": "set_updated_at",
+      "type": "trigger"
+    },
+    {
+      "name": "rls_auto_enable",
+      "type": "event_trigger"
+    },
+    {
+      "name": "get_monthly_spending",
+      "type": "record"
+    },
+    {
+      "name": "get_item_usage_stats",
+      "type": "record"
+    },
+    {
+      "name": "calculate_savings_opportunity",
+      "type": "bigint"
+    },
+    {
+      "name": "get_bank_accounts_with_balance",
+      "type": "record"
+    },
+    {
+      "name": "get_total_bank_balance",
+      "type": "bigint"
+    },
+    {
+      "name": "handle_new_user",
+      "type": "trigger"
+    },
+    {
+      "name": "get_cash_balance",
+      "type": "bigint"
+    },
+    {
+      "name": "get_deducted_money",
+      "type": "bigint"
+    },
+    {
+      "name": "log_audit_event",
+      "type": "trigger"
+    }
+  ],
+  "storage_buckets": [
+    {
+      "id": "avatars",
+      "public": false
+    },
+    {
+      "id": "item-images",
+      "public": false
+    },
+    {
+      "id": "receipt-images",
+      "public": false
+    }
+  ],
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name_ar",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "code",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "logo_url",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "country",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "banks"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "bank_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "sender_pattern",
+          "nullable": "NO",
+          "type": "text"
+        },
+        {
+          "name": "purchase_patterns",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "atm_patterns",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "refund_patterns",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "income_patterns",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "reversal_patterns",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "amount_pattern",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "merchant_pattern",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "card_pattern",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "date_pattern",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "version",
+          "nullable": "NO",
+          "type": "integer"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "bank_sms_patterns"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "code",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name_ar",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "description",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "description_ar",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "icon",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "criteria",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "badges"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "full_name",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "email",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "phone",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "avatar_url",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "language",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "default_bank_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "sms_tracking_enabled",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "notifications_enabled",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "biometric_lock_enabled",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "hide_balances",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "profiles"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name_ar",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "icon",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "parent_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "is_system",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "categories"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "normalized_name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "logo_url",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "merchants"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name_ar",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "description",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "price_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "icon",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "image_url",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "is_archived",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "items"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "item_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "price_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "effective_from",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "effective_to",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "item_price_history"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "cash_wallets"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "wallet_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "reference_type",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "reference_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "description",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "movement_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "cash_movements"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "last4",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "bank_name",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "transaction_count",
+          "nullable": "NO",
+          "type": "integer"
+        },
+        {
+          "name": "appearance",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "is_credit_card",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "credit_limit_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "current_balance_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "cash_withdrawal_enabled",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "detected_cards"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "bank_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "merchant_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "source",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "transaction_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "merchant_name",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "card_last4",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "card_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "raw_reference",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "external_reference",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "fingerprint",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "notes",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "transactions"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "sender",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "message_hash",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "message_body",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "received_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "bank_identified",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "type_identified",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "amount_identified",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "currency_identified",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "card_last4_identified",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "detected_bank_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "detected_bank_name",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "detected_type",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "detected_amount_minor",
+          "nullable": "YES",
+          "type": "bigint"
+        },
+        {
+          "name": "detected_currency",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "detected_card_last4",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "processed_at",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "processing_status",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "transaction_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "parser_version",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "confidence",
+          "nullable": "YES",
+          "type": "double precision"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "sms_messages"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "year",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "month",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "label",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "bank_account_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "monthly_incomes"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "bank_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "account_last4",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "opening_balance_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "user_bank_accounts"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "account_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "description",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "reference_type",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "reference_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "movement_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "user_bank_movements"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "transaction_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "expense_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "payment_method",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "merchant_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "notes",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "expenses"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "expense_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "item_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "quantity",
+          "nullable": "NO",
+          "type": "integer"
+        },
+        {
+          "name": "unit_price_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "total_price_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "expense_items"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "item_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "expense_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "quantity",
+          "nullable": "NO",
+          "type": "integer"
+        },
+        {
+          "name": "total_amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "usage_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "item_usage"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "period",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "start_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "end_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "budgets"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "budget_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "limit_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "budget_categories"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "name_ar",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "icon",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "frequency",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "next_due_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "start_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "end_date",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "is_active",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "recurring_expenses"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "recurring_expense_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "scheduled_date",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "transaction_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "recurring_expense_occurrences"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "target_amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "current_amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "currency",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "target_date",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "saving_goals"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "item_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "baseline_amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "current_amount_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "reduction_percentage",
+          "nullable": "NO",
+          "type": "numeric"
+        },
+        {
+          "name": "estimated_saving_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "month",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "year",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "saving_recommendations"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "severity",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "item_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "title",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "message",
+          "nullable": "NO",
+          "type": "text"
+        },
+        {
+          "name": "data",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "is_read",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "alerts"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "type",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "title",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "message",
+          "nullable": "NO",
+          "type": "text"
+        },
+        {
+          "name": "data",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "is_read",
+          "nullable": "NO",
+          "type": "boolean"
+        },
+        {
+          "name": "scheduled_for",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "sent_at",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "notifications"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "year",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "month",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "total_income_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "total_expenses_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "card_expenses_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "cash_expenses_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "atm_withdrawals_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "top_category_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "top_item_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "top_merchant_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "potential_savings_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "actual_savings_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "report_data",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "generated_at",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "monthly_reports"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "item_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "year",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "month",
+          "nullable": "NO",
+          "type": "smallint"
+        },
+        {
+          "name": "quantity",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "purchase_events",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "total_spending_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "average_price_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "previous_quantity",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "previous_spending_minor",
+          "nullable": "NO",
+          "type": "bigint"
+        },
+        {
+          "name": "usage_change_percentage",
+          "nullable": "NO",
+          "type": "numeric"
+        },
+        {
+          "name": "spending_change_percentage",
+          "nullable": "NO",
+          "type": "numeric"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "monthly_item_statistics"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "badge_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "earned_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "metadata",
+          "nullable": "NO",
+          "type": "jsonb"
+        }
+      ],
+      "name": "user_badges"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "action",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "entity_type",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "entity_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "old_data",
+          "nullable": "YES",
+          "type": "jsonb"
+        },
+        {
+          "name": "new_data",
+          "nullable": "YES",
+          "type": "jsonb"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "audit_logs"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "title",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "ai_conversations"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "conversation_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "role",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "content",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "tool_name",
+          "nullable": "YES",
+          "type": "character varying"
+        },
+        {
+          "name": "tool_arguments",
+          "nullable": "YES",
+          "type": "jsonb"
+        },
+        {
+          "name": "tool_result",
+          "nullable": "YES",
+          "type": "jsonb"
+        },
+        {
+          "name": "metadata",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "ai_messages"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "conversation_id",
+          "nullable": "YES",
+          "type": "uuid"
+        },
+        {
+          "name": "tool_name",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "arguments",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "result",
+          "nullable": "YES",
+          "type": "jsonb"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "confirmed_at",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "completed_at",
+          "nullable": "YES",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "ai_actions"
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "user_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "entity_type",
+          "nullable": "NO",
+          "type": "character varying"
+        },
+        {
+          "name": "entity_id",
+          "nullable": "NO",
+          "type": "uuid"
+        },
+        {
+          "name": "operation",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "payload",
+          "nullable": "NO",
+          "type": "jsonb"
+        },
+        {
+          "name": "status",
+          "nullable": "NO",
+          "type": "USER-DEFINED"
+        },
+        {
+          "name": "retry_count",
+          "nullable": "NO",
+          "type": "integer"
+        },
+        {
+          "name": "last_error",
+          "nullable": "YES",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "updated_at",
+          "nullable": "NO",
+          "type": "timestamp with time zone"
+        }
+      ],
+      "name": "sync_queue"
+    }
+  ],
+  "triggers": null,
+  "views": [
+    {
+      "definition": " SELECT user_id,\n    COALESCE(sum(\n        CASE\n            WHEN (type = 'in'::movement_type) THEN amount_minor\n            ELSE (- amount_minor)\n        END), (0)::numeric) AS cash_balance_minor\n   FROM cash_movements cm\n  GROUP BY user_id;",
+      "name": "v_user_balances"
+    },
+    {
+      "definition": " SELECT mis.user_id,\n    mis.item_id,\n    i.name AS item_name,\n    mis.year,\n    mis.month,\n    mis.quantity,\n    mis.total_spending_minor,\n    mis.usage_change_percentage\n   FROM (monthly_item_statistics mis\n     LEFT JOIN items i ON ((i.id = mis.item_id)));",
+      "name": "v_monthly_item_summary"
+    }
+  ]
+}

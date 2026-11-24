@@ -3,8 +3,8 @@
 ## Getting Started with Development
 
 ### Prerequisites
-- Flutter SDK 3.13+
-- Dart 3.1+
+- Flutter SDK compatible with Dart 3.10+ and native asset hooks (validated with Flutter 3.47.7 / Dart 3.13.5)
+- Keep `pubspec.lock` and the sqlite3mc hook configuration in `pubspec.yaml`
 - Android Studio / Xcode
 - Supabase account
 - VS Code or Android Studio

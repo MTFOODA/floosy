@@ -141,14 +141,14 @@ class _BudgetCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${formatMoney(data.totalSpentMinor, data.budget.currency)} / '
-                  '${formatMoney(data.budget.amountMinor, data.budget.currency)}',
+                  '${formatMoney(data.totalSpentMinor, l.currencySymbol(data.budget.currency))} / '
+                  '${formatMoney(data.budget.amountMinor, l.currencySymbol(data.budget.currency))}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 Text(
                   data.remainingMinor >= 0
-                      ? '${l['remaining']}: ${formatMoney(data.remainingMinor, data.budget.currency)}'
-                      : '${l['budgetOverspent']}: ${formatMoney(-data.remainingMinor, data.budget.currency)}',
+                      ? '${l['remaining']}: ${formatMoney(data.remainingMinor, l.currencySymbol(data.budget.currency))}'
+                      : '${l['budgetOverspent']}: ${formatMoney(-data.remainingMinor, l.currencySymbol(data.budget.currency))}',
                   style: TextStyle(
                       color: data.remainingMinor >= 0
                           ? AppTheme.successColor

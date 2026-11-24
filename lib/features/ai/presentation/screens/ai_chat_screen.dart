@@ -17,11 +17,11 @@ class _AIChatScreenState extends State<AIChatScreen> {
   List<ChatMessage> get _messages => context.read<AIChatCubit>().state.messages;
   bool get _isTyping => context.read<AIChatCubit>().state.typing;
 
-  static const _suggestions = [
-    "What's my total spending this month?",
-    "Which category did I spend most on?",
-    "How much cash do I have?",
-    "Show me my top 3 expenses",
+  List<String> get _suggestions => [
+    AppLocalizations.s(context)['aiQuickPlan'],
+    AppLocalizations.s(context)['aiQuickWithdrawals'],
+    AppLocalizations.s(context)['aiQuickMonth'],
+    AppLocalizations.s(context)['aiQuickBalances'],
   ];
 
   @override
@@ -30,7 +30,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final l = AppLocalizations.s(context);
-      context.read<AIChatCubit>().greet(l['askQuestion']);
+      context.read<AIChatCubit>().greet(l['aiWelcome']);
     });
   }
 
@@ -44,7 +44,11 @@ class _AIChatScreenState extends State<AIChatScreen> {
     final cubit = context.read<AIChatCubit>();
     if (cubit.state.typing || text.trim().isEmpty) return;
     _inputController.clear();
-    await cubit.send(text, errorText: AppLocalizations.s(context)['aiError']);
+    await cubit.send(
+      text,
+      errorText: AppLocalizations.s(context)['aiError'],
+      arabic: AppLocalizations.s(context).isArabic,
+    );
   }
 
   @override
@@ -76,43 +80,66 @@ class _AIChatScreenState extends State<AIChatScreen> {
     return Row(
       children: [
         Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-                gradient: FloosyDesign.purpleGradient, shape: BoxShape.circle),
-            child: const Icon(Icons.smart_toy_rounded,
-                color: Colors.white, size: 24)),
+          width: 48,
+          height: 48,
+          decoration: const BoxDecoration(
+            gradient: FloosyDesign.purpleGradient,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.smart_toy_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Hello! I'm Floosy AI",
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                AppLocalizations.s(context)['aiHello'],
                 style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: context.fc.textPrimary)),
-            const SizedBox(height: 2),
-            Text('Ask me anything about your finances',
-                style:
-                    TextStyle(fontSize: 13, color: context.fc.textSecondary)),
-          ],
-        )),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: context.fc.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                AppLocalizations.s(context)['aiHelp'],
+                style: TextStyle(fontSize: 13, color: context.fc.textSecondary),
+              ),
+            ],
+          ),
+        ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-              color: FloosyDesign.positive.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(FloosyDesign.radiusPill)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
+            color: FloosyDesign.positive.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(FloosyDesign.radiusPill),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
                 width: 7,
                 height: 7,
                 decoration: const BoxDecoration(
-                    color: FloosyDesign.positive, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            const Text('Online',
-                style: TextStyle(fontSize: 12, color: FloosyDesign.positive)),
-          ]),
+                  color: FloosyDesign.positive,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                AppLocalizations.s(context)['aiAvailable'],
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: FloosyDesign.positive,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -121,16 +148,22 @@ class _AIChatScreenState extends State<AIChatScreen> {
   Widget _buildChatArea() {
     if (_messages.isEmpty) {
       return Center(
-          child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.chat_bubble_outline,
-              size: 48, color: context.fc.textMuted),
-          const SizedBox(height: 12),
-          Text('Ask me about your finances',
-              style: TextStyle(color: context.fc.textMuted)),
-        ],
-      ));
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 48,
+              color: context.fc.textMuted,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              AppLocalizations.s(context)['aiAsk'],
+              style: TextStyle(color: context.fc.textMuted),
+            ),
+          ],
+        ),
+      );
     }
     return ListView.builder(
       reverse: true,
@@ -160,13 +193,19 @@ class _AIChatScreenState extends State<AIChatScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                  color: context.fc.chatBubbleUser,
-                  borderRadius: BorderRadius.circular(FloosyDesign.radiusPill),
-                  border: Border.all(color: context.fc.borderSubtle)),
+                color: context.fc.chatBubbleUser,
+                borderRadius: BorderRadius.circular(FloosyDesign.radiusPill),
+                border: Border.all(color: context.fc.borderSubtle),
+              ),
               child: Center(
-                  child: Text(_suggestions[i],
-                      style: TextStyle(
-                          fontSize: 13, color: context.fc.textSecondary))),
+                child: Text(
+                  _suggestions[i],
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.fc.textSecondary,
+                  ),
+                ),
+              ),
             ),
           );
         },
@@ -178,9 +217,10 @@ class _AIChatScreenState extends State<AIChatScreen> {
     return Container(
       height: 58,
       decoration: BoxDecoration(
-          color: context.fc.primarySurface,
-          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-          border: Border.all(color: context.fc.borderSubtle)),
+        color: context.fc.primarySurface,
+        borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+        border: Border.all(color: context.fc.borderSubtle),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -188,10 +228,11 @@ class _AIChatScreenState extends State<AIChatScreen> {
               controller: _inputController,
               style: TextStyle(color: context.fc.textPrimary),
               decoration: InputDecoration(
-                  hintText: 'Ask about your spending...',
-                  hintStyle: TextStyle(color: context.fc.textMuted),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 18)),
+                hintText: AppLocalizations.s(context)['aiInputHint'],
+                hintStyle: TextStyle(color: context.fc.textMuted),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+              ),
               onSubmitted: _sendMessage,
             ),
           ),
@@ -202,10 +243,14 @@ class _AIChatScreenState extends State<AIChatScreen> {
               height: 48,
               margin: const EdgeInsets.all(5),
               decoration: const BoxDecoration(
-                  gradient: FloosyDesign.purpleGradient,
-                  shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                gradient: FloosyDesign.purpleGradient,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
         ],

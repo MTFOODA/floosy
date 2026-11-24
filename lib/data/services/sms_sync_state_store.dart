@@ -35,6 +35,7 @@ class SmsSyncState {
   final DateTime? lastProcessedAt;
   final int pagesScanned;
   final DateTime? updatedAt;
+  final DateTime? firstAllowedAt;
 
   const SmsSyncState({
     this.historyComplete = false,
@@ -43,6 +44,7 @@ class SmsSyncState {
     this.lastProcessedAt,
     this.pagesScanned = 0,
     this.updatedAt,
+    this.firstAllowedAt,
   });
 
   /// Nothing scanned yet: the next scan is the FIRST (historical) scan.
@@ -53,8 +55,12 @@ class SmsSyncState {
   bool get isWalking => !historyComplete || pendingSince != null;
 
   /// Inclusive lower bound for the next INCREMENTAL inbox query.
-  DateTime? incrementalSince(Duration overlap) =>
-      lastProcessedAt?.subtract(overlap);
+  DateTime? incrementalSince(Duration overlap) {
+    final since = lastProcessedAt?.subtract(overlap);
+    final floor = firstAllowedAt;
+    if (floor != null && (since == null || since.isBefore(floor))) return floor;
+    return since;
+  }
 
   SmsSyncState copyWith({
     bool? historyComplete,
@@ -66,28 +72,32 @@ class SmsSyncState {
     bool clearLastProcessedAt = false,
     int? pagesScanned,
     DateTime? updatedAt,
+    DateTime? firstAllowedAt,
   }) {
     return SmsSyncState(
       historyComplete: historyComplete ?? this.historyComplete,
       walkCursor: clearWalkCursor ? null : (walkCursor ?? this.walkCursor),
-      pendingSince:
-          clearPendingSince ? null : (pendingSince ?? this.pendingSince),
+      pendingSince: clearPendingSince
+          ? null
+          : (pendingSince ?? this.pendingSince),
       lastProcessedAt: clearLastProcessedAt
           ? null
           : (lastProcessedAt ?? this.lastProcessedAt),
       pagesScanned: pagesScanned ?? this.pagesScanned,
       updatedAt: updatedAt ?? this.updatedAt,
+      firstAllowedAt: firstAllowedAt ?? this.firstAllowedAt,
     );
   }
 
   Map<String, Object?> toJson() => {
-        'historyComplete': historyComplete,
-        'walkCursor': walkCursor?.toIso8601String(),
-        'pendingSince': pendingSince?.toIso8601String(),
-        'lastProcessedAt': lastProcessedAt?.toIso8601String(),
-        'pagesScanned': pagesScanned,
-        'updatedAt': updatedAt?.toIso8601String(),
-      };
+    'historyComplete': historyComplete,
+    'walkCursor': walkCursor?.toIso8601String(),
+    'pendingSince': pendingSince?.toIso8601String(),
+    'lastProcessedAt': lastProcessedAt?.toIso8601String(),
+    'pagesScanned': pagesScanned,
+    'updatedAt': updatedAt?.toIso8601String(),
+    'firstAllowedAt': firstAllowedAt?.toIso8601String(),
+  };
 
   factory SmsSyncState.fromJson(Map<String, dynamic> json) {
     DateTime? parse(Object? raw) =>
@@ -99,6 +109,7 @@ class SmsSyncState {
       lastProcessedAt: parse(json['lastProcessedAt']),
       pagesScanned: (json['pagesScanned'] as num?)?.toInt() ?? 0,
       updatedAt: parse(json['updatedAt']),
+      firstAllowedAt: parse(json['firstAllowedAt']),
     );
   }
 
@@ -108,15 +119,23 @@ class SmsSyncState {
       other.historyComplete == historyComplete &&
       other.walkCursor == walkCursor &&
       other.pendingSince == pendingSince &&
+      other.firstAllowedAt == firstAllowedAt &&
       other.lastProcessedAt == lastProcessedAt &&
       other.pagesScanned == pagesScanned;
 
   @override
   int get hashCode => Object.hash(
-      historyComplete, walkCursor, pendingSince, lastProcessedAt, pagesScanned);
+    historyComplete,
+    walkCursor,
+    pendingSince,
+    lastProcessedAt,
+    pagesScanned,
+    firstAllowedAt,
+  );
 
   @override
-  String toString() => 'SmsSyncState(historyComplete=$historyComplete, '
+  String toString() =>
+      'SmsSyncState(historyComplete=$historyComplete, '
       'walkCursor=$walkCursor, pendingSince=$pendingSince, '
       'lastProcessedAt=$lastProcessedAt, pages=$pagesScanned)';
 }
@@ -150,8 +169,10 @@ class SmsSyncStateStore {
       _memory[userId] = parsed;
       return parsed;
     } catch (e) {
-      logWarning('SMS_SYNC_STATE read unavailable (${e.runtimeType}) — '
-          'using in-memory cursor');
+      logWarning(
+        'SMS_SYNC_STATE read unavailable (${e.runtimeType}) — '
+        'using in-memory cursor',
+      );
       return _memory[userId] ?? SmsSyncState.empty;
     }
   }
@@ -165,8 +186,10 @@ class SmsSyncStateStore {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_key(userId), jsonEncode(state.toJson()));
     } catch (e) {
-      logWarning('SMS_SYNC_STATE write unavailable (${e.runtimeType}) — '
-          'cursor kept in memory only');
+      logWarning(
+        'SMS_SYNC_STATE write unavailable (${e.runtimeType}) — '
+        'cursor kept in memory only',
+      );
     }
   }
 

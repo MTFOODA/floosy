@@ -1,6 +1,8 @@
 import AppIntents
 import Flutter
 import Foundation
+import CryptoKit
+import Security
 
 // This is an app-local App Intent, not a message-filter extension. Shortcuts
 // supplies the input with the user's permission; no SMS database is queried.
@@ -22,12 +24,14 @@ private struct BankMessageState: Codable {
   var owner: String?
   var enabledOwners: Set<String> = []
   var messages: [BankMessageRecord] = []
+  var resetEpoch: String?
 }
 
 private enum BankMessageError: LocalizedError {
-  case signIn, disabled, invalidInput, full
+  case signIn, disabled, invalidInput, full, storage
   var errorDescription: String? {
     switch self {
+    case .storage: return "Secure message storage is unavailable. Open Floosy and try again."
     case .signIn: return "Open Floosy and sign in before importing bank messages."
     case .disabled: return "Enable bank message import in Floosy Settings first."
     case .invalidInput: return "Provide the bank sender, message text and a valid received date."
@@ -55,16 +59,76 @@ private actor BankMessageQueue {
     return directory.appendingPathComponent("queue.json")
   }
 
+  private func encryptedURL() throws -> URL {
+    try fileURL().deletingLastPathComponent().appendingPathComponent("queue.encrypted")
+  }
+
+  private func key() throws -> SymmetricKey {
+    let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: "floosy.bank-import.v1", kSecAttrAccount as String: "device-key",
+      kSecAttrSynchronizable as String: false]
+    var lookup = query
+    lookup[kSecReturnData as String] = true
+    lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(lookup as CFDictionary, &result)
+    if status == errSecSuccess, let bytes = result as? Data, bytes.count == 32 {
+      return SymmetricKey(data: bytes)
+    }
+    // Never replace a missing/inaccessible key when encrypted data exists.
+    guard status == errSecItemNotFound,
+      !FileManager.default.fileExists(atPath: try encryptedURL().path) else { throw BankMessageError.storage }
+    let generated = SymmetricKey(size: .bits256)
+    let data = generated.withUnsafeBytes { Data($0) }
+    var item = query
+    item[kSecValueData as String] = data
+    item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw BankMessageError.storage }
+    return generated
+  }
+
   private func load() throws -> BankMessageState {
-    let url = try fileURL()
-    guard FileManager.default.fileExists(atPath: url.path) else { return BankMessageState() }
-    // Decode failures are errors, never a reason to overwrite a saved queue.
-    return try JSONDecoder().decode(BankMessageState.self, from: Data(contentsOf: url))
+    let encrypted = try encryptedURL()
+    let legacy = try fileURL()
+    if FileManager.default.fileExists(atPath: encrypted.path) {
+      let bytes = try AES.GCM.open(AES.GCM.SealedBox(combined: Data(contentsOf: encrypted)), using: key())
+      let state = try JSONDecoder().decode(BankMessageState.self, from: bytes)
+      if FileManager.default.fileExists(atPath: legacy.path) {
+        let old = try JSONDecoder().decode(BankMessageState.self, from: Data(contentsOf: legacy))
+        // Resume cleanup after a crash only when every original record survived.
+        guard old.messages.allSatisfy({ record in state.messages.contains(where: {
+          $0.id == record.id && $0.owner == record.owner && $0.sender == record.sender &&
+          $0.body == record.body && $0.receivedAt == record.receivedAt
+        }) }) else { throw BankMessageError.storage }
+        try FileManager.default.removeItem(at: legacy)
+      }
+      return state
+    }
+    guard FileManager.default.fileExists(atPath: legacy.path) else { return BankMessageState() }
+    let state = try JSONDecoder().decode(BankMessageState.self, from: Data(contentsOf: legacy))
+    try save(state)
+    // Read/decrypt verification inside save precedes removal of the old source.
+    try FileManager.default.removeItem(at: legacy)
+    return state
   }
 
   private func save(_ state: BankMessageState) throws {
-    try JSONEncoder().encode(state).write(to: fileURL(),
-      options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    let plaintext = try JSONEncoder().encode(state)
+    let secret = try key()
+    guard let encrypted = try AES.GCM.seal(plaintext, using: secret).combined else { throw BankMessageError.storage }
+    let destination = try encryptedURL()
+    try encrypted.write(to: destination, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    let verified = try AES.GCM.open(AES.GCM.SealedBox(combined: Data(contentsOf: destination)), using: secret)
+    guard verified == plaintext else { throw BankMessageError.storage }
+  }
+
+  func resetTestData(_ epoch: String) throws {
+    guard epoch == "test-reset-2026-11-21" else { throw BankMessageError.invalidInput }
+    var state = try load()
+    guard state.resetEpoch != epoch else { return }
+    state.messages = []
+    state.resetEpoch = epoch
+    try save(state)
   }
 
   private func requireOwner(_ owner: String, state: BankMessageState) throws {
@@ -167,6 +231,12 @@ enum BankMessageImportBridge {
         do {
           let args = call.arguments as? [String: Any] ?? [:]
           let queue = BankMessageQueue.shared
+          if call.method == "resetTestData" {
+            guard let epoch = args["epoch"] as? String else { throw BankMessageError.invalidInput }
+            try await queue.resetTestData(epoch)
+            result(nil)
+            return
+          }
           if call.method == "bindUser" {
             try await queue.bind(args["userId"] as? String)
             result(nil)

@@ -35,6 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -45,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 160,
               height: 160,
               child: Image.asset(
-                'assets/logo/floosy.png',
+                'assets/logo/floosy_symbol.png',
                 fit: BoxFit.contain,
                 width: 160,
                 height: 160,
@@ -53,17 +54,18 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Floosy',
+              AppLocalizations.s(context)['appBrand'],
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF10364A),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               AppLocalizations.s(context)['smartFinance'],
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey),
             ),
           ],
         ),

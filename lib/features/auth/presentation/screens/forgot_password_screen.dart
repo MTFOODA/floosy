@@ -49,8 +49,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(
-            () => _errorMessage = '${l['resetEmailFailed']}: ${e.toString()}');
+        setState(() => _errorMessage = l['resetEmailFailed']);
       }
     }
   }
@@ -76,15 +75,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               Text(
                 l['resetPassword'],
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _isEmailSent ? l['checkEmail'] : l['resetInstructions'],
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
               ),
               const SizedBox(height: 40),
               if (_errorMessage != null) ...[
@@ -115,11 +114,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     children: [
                       Text(
                         l['emailSent'],
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -142,7 +141,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   controller: _emailController,
                   decoration: InputDecoration(
                     labelText: l['email'],
-                    hintText: 'your@email.com',
+                    hintText: l['emailHint'],
                   ),
                   keyboardType: TextInputType.emailAddress,
                 ),

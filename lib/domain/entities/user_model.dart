@@ -7,7 +7,7 @@ DateTime? _dateTimeFromJson(dynamic value) =>
     value == null ? null : DateTime.parse(value.toString()).toUtc();
 
 @freezed
-class UserProfile with _$UserProfile {
+abstract class UserProfile with _$UserProfile {
   const factory UserProfile({
     required String id,
     @JsonKey(name: 'full_name') String? fullName,
@@ -38,7 +38,7 @@ class UserProfile with _$UserProfile {
 }
 
 @freezed
-class Bank with _$Bank {
+abstract class Bank with _$Bank {
   const factory Bank({
     required String id,
     required String name,
@@ -58,7 +58,7 @@ class Bank with _$Bank {
 }
 
 @freezed
-class BankSMSPattern with _$BankSMSPattern {
+abstract class BankSMSPattern with _$BankSMSPattern {
   const factory BankSMSPattern({
     required String id,
     @JsonKey(name: 'bank_id') required String bankId,

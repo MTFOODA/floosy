@@ -9,22 +9,26 @@ class ItemLocalDataSource {
   ItemLocalDataSource(this._db);
 
   Future<void> insertItem(Item item) async {
-    await _db.into(_db.items).insert(db.ItemsCompanion(
-          id: Value(item.id),
-          userId: Value(item.userId),
-          name: Value(item.name),
-          nameAr: Value(item.nameAr),
-          description: Value(item.description),
-          priceMinor: Value(item.priceMinor),
-          currency: Value(item.currency),
-          categoryId: Value(item.categoryId),
-          icon: Value(item.icon),
-          imageUrl: Value(item.imageUrl),
-          isActive: Value(item.isActive),
-          isArchived: Value(item.isArchived),
-          createdAt: Value(item.createdAt ?? DateTime.now()),
-          updatedAt: Value(item.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.items)
+        .insert(
+          db.ItemsCompanion(
+            id: Value(item.id),
+            userId: Value(item.userId),
+            name: Value(item.name),
+            nameAr: Value(item.nameAr),
+            description: Value(item.description),
+            priceMinor: Value(item.priceMinor),
+            currency: Value(item.currency),
+            categoryId: Value(item.categoryId),
+            icon: Value(item.icon),
+            imageUrl: Value(item.imageUrl),
+            isActive: Value(item.isActive),
+            isArchived: Value(item.isArchived),
+            createdAt: Value(item.createdAt ?? DateTime.now()),
+            updatedAt: Value(item.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   /// Atomic upsert used by the remote→local synchronization path.
@@ -35,22 +39,26 @@ class ItemLocalDataSource {
   /// previous blind INSERT which crashed with
   /// `UNIQUE constraint failed: items.id` on every refetch.
   Future<void> upsertItem(Item item) async {
-    await _db.into(_db.items).insertOnConflictUpdate(db.ItemsCompanion(
-          id: Value(item.id),
-          userId: Value(item.userId),
-          name: Value(item.name),
-          nameAr: Value(item.nameAr),
-          description: Value(item.description),
-          priceMinor: Value(item.priceMinor),
-          currency: Value(item.currency),
-          categoryId: Value(item.categoryId),
-          icon: Value(item.icon),
-          imageUrl: Value(item.imageUrl),
-          isActive: Value(item.isActive),
-          isArchived: Value(item.isArchived),
-          createdAt: Value(item.createdAt ?? DateTime.now()),
-          updatedAt: Value(item.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.items)
+        .insertOnConflictUpdate(
+          db.ItemsCompanion(
+            id: Value(item.id),
+            userId: Value(item.userId),
+            name: Value(item.name),
+            nameAr: Value(item.nameAr),
+            description: Value(item.description),
+            priceMinor: Value(item.priceMinor),
+            currency: Value(item.currency),
+            categoryId: Value(item.categoryId),
+            icon: Value(item.icon),
+            imageUrl: Value(item.imageUrl),
+            isActive: Value(item.isActive),
+            isArchived: Value(item.isArchived),
+            createdAt: Value(item.createdAt ?? DateTime.now()),
+            updatedAt: Value(item.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<Item>> getItems(String userId, {bool activeOnly = false}) async {
@@ -68,8 +76,9 @@ class ItemLocalDataSource {
   }
 
   Future<Item?> getItem(String itemId) async {
-    final row = await (_db.select(_db.items)..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.items,
+    )..where((t) => t.id.equals(itemId))).getSingleOrNull();
     return row == null ? null : _mapItem(row);
   }
 

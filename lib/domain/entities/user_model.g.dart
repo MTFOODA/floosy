@@ -6,25 +6,24 @@ part of 'user_model.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
-    _$UserProfileImpl(
-      id: json['id'] as String,
-      fullName: json['full_name'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
-      language: json['language'] as String? ?? 'ar',
-      currency: json['currency'] as String? ?? 'EGP',
-      defaultBankId: json['default_bank_id'] as String?,
-      smsTrackingEnabled: json['sms_tracking_enabled'] as bool? ?? false,
-      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
-      biometricLockEnabled: json['biometric_lock_enabled'] as bool? ?? false,
-      hideBalances: json['hide_balances'] as bool? ?? false,
-      createdAt: _dateTimeFromJson(json['created_at']),
-      updatedAt: _dateTimeFromJson(json['updated_at']),
-    );
+_UserProfile _$UserProfileFromJson(Map<String, dynamic> json) => _UserProfile(
+  id: json['id'] as String,
+  fullName: json['full_name'] as String?,
+  email: json['email'] as String?,
+  phone: json['phone'] as String?,
+  avatarUrl: json['avatar_url'] as String?,
+  language: json['language'] as String? ?? 'ar',
+  currency: json['currency'] as String? ?? 'EGP',
+  defaultBankId: json['default_bank_id'] as String?,
+  smsTrackingEnabled: json['sms_tracking_enabled'] as bool? ?? false,
+  notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
+  biometricLockEnabled: json['biometric_lock_enabled'] as bool? ?? false,
+  hideBalances: json['hide_balances'] as bool? ?? false,
+  createdAt: _dateTimeFromJson(json['created_at']),
+  updatedAt: _dateTimeFromJson(json['updated_at']),
+);
 
-Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
+Map<String, dynamic> _$UserProfileToJson(_UserProfile instance) =>
     <String, dynamic>{
       'id': instance.id,
       'full_name': instance.fullName,
@@ -42,35 +41,34 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'updated_at': instance.updatedAt?.toIso8601String(),
     };
 
-_$BankImpl _$$BankImplFromJson(Map<String, dynamic> json) => _$BankImpl(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      nameAr: json['name_ar'] as String?,
-      code: json['code'] as String?,
-      logoUrl: json['logo_url'] as String?,
-      country: json['country'] as String? ?? 'EG',
-      currency: json['currency'] as String? ?? 'EGP',
-      isActive: json['is_active'] as bool? ?? true,
-      createdAt: _dateTimeFromJson(json['created_at']),
-      updatedAt: _dateTimeFromJson(json['updated_at']),
-    );
+_Bank _$BankFromJson(Map<String, dynamic> json) => _Bank(
+  id: json['id'] as String,
+  name: json['name'] as String,
+  nameAr: json['name_ar'] as String?,
+  code: json['code'] as String?,
+  logoUrl: json['logo_url'] as String?,
+  country: json['country'] as String? ?? 'EG',
+  currency: json['currency'] as String? ?? 'EGP',
+  isActive: json['is_active'] as bool? ?? true,
+  createdAt: _dateTimeFromJson(json['created_at']),
+  updatedAt: _dateTimeFromJson(json['updated_at']),
+);
 
-Map<String, dynamic> _$$BankImplToJson(_$BankImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'name': instance.name,
-      'name_ar': instance.nameAr,
-      'code': instance.code,
-      'logo_url': instance.logoUrl,
-      'country': instance.country,
-      'currency': instance.currency,
-      'is_active': instance.isActive,
-      'created_at': instance.createdAt?.toIso8601String(),
-      'updated_at': instance.updatedAt?.toIso8601String(),
-    };
+Map<String, dynamic> _$BankToJson(_Bank instance) => <String, dynamic>{
+  'id': instance.id,
+  'name': instance.name,
+  'name_ar': instance.nameAr,
+  'code': instance.code,
+  'logo_url': instance.logoUrl,
+  'country': instance.country,
+  'currency': instance.currency,
+  'is_active': instance.isActive,
+  'created_at': instance.createdAt?.toIso8601String(),
+  'updated_at': instance.updatedAt?.toIso8601String(),
+};
 
-_$BankSMSPatternImpl _$$BankSMSPatternImplFromJson(Map<String, dynamic> json) =>
-    _$BankSMSPatternImpl(
+_BankSMSPattern _$BankSMSPatternFromJson(Map<String, dynamic> json) =>
+    _BankSMSPattern(
       id: json['id'] as String,
       bankId: json['bank_id'] as String,
       senderPattern: json['sender_pattern'] as String,
@@ -89,8 +87,7 @@ _$BankSMSPatternImpl _$$BankSMSPatternImplFromJson(Map<String, dynamic> json) =>
       updatedAt: _dateTimeFromJson(json['updated_at']),
     );
 
-Map<String, dynamic> _$$BankSMSPatternImplToJson(
-        _$BankSMSPatternImpl instance) =>
+Map<String, dynamic> _$BankSMSPatternToJson(_BankSMSPattern instance) =>
     <String, dynamic>{
       'id': instance.id,
       'bank_id': instance.bankId,

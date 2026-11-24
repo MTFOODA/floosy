@@ -1,11 +1,17 @@
+import '../data/services/fresh_start_service.dart';
+import '../data/local/datasources/local_core_adapters.dart';
+import '../data/local/datasources/local_auxiliary_adapters.dart';
+import '../data/local/datasources/local_sms_adapter.dart';
+import '../data/local/datasources/private_record_store.dart';
+import '../data/services/private_item_image_service.dart';
+import '../data/services/private_sender_mapping_store.dart';
+import '../data/services/private_sms_sync_state_store.dart';
 import '../data/services/transaction_movement_reconciler.dart';
 import 'package:flutter/foundation.dart';
 import '../core/services/ios_bank_message_bridge.dart';
 import '../data/services/ios_bank_message_repository.dart';
 import '../domain/repositories/sms_repository.dart';
-import '../core/utils/app_logger.dart';
 import 'app_repositories.dart';
-import '../config/sms_import_config.dart';
 import '../data/services/egp_exchange_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/local/database/app_database.dart' as db;
@@ -23,7 +29,6 @@ import '../data/remote/datasources/ai_remote_datasource.dart';
 import '../data/remote/datasources/money_remote_datasource.dart';
 import '../data/remote/datasources/profile_remote_datasource.dart';
 import '../data/remote/datasources/sms_remote_datasource.dart';
-import '../data/remote/datasources/detected_card_remote_datasource.dart';
 import '../data/local/datasources/transaction_local_datasource.dart';
 import '../data/local/datasources/money_local_datasource.dart';
 import '../data/local/datasources/item_local_datasource.dart';
@@ -48,6 +53,8 @@ import '../data/services/sms_transaction_processor.dart';
 import '../data/services/sms_ingestion_service.dart';
 import '../data/services/sms_polling_service.dart';
 import '../data/services/sms_sync_state_store.dart';
+import '../data/services/sms_classification_repair.dart';
+import '../data/services/encrypted_backup_service.dart';
 import '../data/services/transaction_data_reset_service.dart';
 import '../data/services/bank_sender_mapping_store.dart';
 import '../core/services/sms_inbox_service.dart';
@@ -57,6 +64,7 @@ import '../domain/entities/user_model.dart';
 import '../data/repositories/account_repository.dart';
 import '../data/repositories/financial_queries_repository.dart';
 import '../data/repositories/app_preferences_repository.dart';
+import '../data/repositories/salary_plan_repository.dart';
 import '../core/services/biometric_lock_service.dart';
 
 /// The only place that constructs infrastructure and concrete repositories.
@@ -64,38 +72,91 @@ import '../core/services/biometric_lock_service.dart';
 class AppDependencies {
   String? Function() currentUserId = () => null;
   void Function() onDataChanged = () {};
-  AppDependencies(
-      {SupabaseClient? client,
-      db.AppDatabase? database,
-      TransactionRemoteDataSource? transactionRemote,
-      MoneyRemoteDataSource? moneyRemote,
-      SmsRemoteDataSource? smsRemote,
-      DetectedCardRepository? cards,
-      TransactionRepository? transactions})
-      : supabaseClient = client ?? Supabase.instance.client,
-        appDatabase = database ?? db.AppDatabase() {
+  AppDependencies({
+    SupabaseClient? client,
+    db.AppDatabase? database,
+    TransactionRemoteDataSource? transactionRemote,
+    MoneyRemoteDataSource? moneyRemote,
+    SmsRemoteDataSource? smsRemote,
+    DetectedCardRepository? cards,
+    TransactionRepository? transactions,
+    SmsInboxService? inbox,
+  }) : supabaseClient = client ?? Supabase.instance.client,
+       appDatabase = database ?? db.AppDatabase() {
+    currentUserId = () => supabaseClient.auth.currentUser?.id;
     transactionRemoteDataSource =
-        transactionRemote ?? TransactionRemoteDataSource(supabaseClient);
+        transactionRemote ??
+        LocalTransactionAdapter(
+          supabaseClient,
+          appDatabase,
+          () => currentUserId(),
+        );
     moneyRemoteDataSource =
-        moneyRemote ?? MoneyRemoteDataSource(supabaseClient);
-    smsRemoteDataSource = smsRemote ?? SmsRemoteDataSource(supabaseClient);
-    detectedCardRepository = cards ??
+        moneyRemote ??
+        LocalMoneyAdapter(supabaseClient, appDatabase, privateRecords);
+    smsRemoteDataSource =
+        smsRemote ?? LocalSmsAdapter(supabaseClient, privateRecords);
+    detectedCardRepository =
+        cards ??
         DetectedCardRepository(
-            local: detectedCardLocalDataSource,
-            remote: DetectedCardRemoteDataSource(supabaseClient));
+          local: detectedCardLocalDataSource,
+          remote: null,
+        );
     _transactionOverride = transactions;
+    _inboxOverride = inbox;
   }
+  SmsInboxService? _inboxOverride;
   TransactionRepository? _transactionOverride;
   late final accountRepository = SupabaseAccountRepository(authRepository);
-  late final preferences = SharedAppPreferences();
+  late final preferences = PrivateAppPreferences(privateRecords);
   late final biometrics = BiometricLockService();
   late final queries = FinancialQueries(
-      banks: bankRemoteDataSource,
-      money: moneyLocalDataSource,
-      transactions: transactionRepository,
-      frequency: highFrequencyService,
-      images: itemImageService);
+    banks: bankRemoteDataSource,
+    money: moneyLocalDataSource,
+    transactions: transactionRepository,
+    frequency: highFrequencyService,
+    images: itemImageService,
+  );
   final db.AppDatabase appDatabase;
+  late final privateRecords = PrivateRecordStore(
+    appDatabase,
+    () => currentUserId(),
+  );
+  late final freshStart = FreshStartService(privateRecords);
+  late final backup = EncryptedBackupService(
+    privateRecords,
+    afterRestore: (user) async {
+      await privateRecords.delete(
+        'preferences',
+        SmsClassificationRepair.version,
+      );
+      await SmsClassificationRepair(
+        privateRecords,
+        smsMessageLocalDataSource,
+        transactionRepository,
+      ).run(user);
+    },
+  );
+  String? _preparedUser;
+  Future<void> prepareUser(String user) async {
+    _preparedUser = null;
+    if (currentUserId() != user) throw StateError('Account changed');
+    await appDatabase.customSelect('SELECT 1').get();
+    await freshStart.initialize(user);
+    await SmsClassificationRepair(
+      privateRecords,
+      smsMessageLocalDataSource,
+      transactionRepository,
+    ).run(user);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      await const IosBankMessageBridge().resetTestData(FreshStartService.epoch);
+    }
+    await detectedCardLocalDataSource.getCards(user);
+    await bankSenderMappingStore.getUnknownSenders(user);
+    await smsSyncStateStore.read(user);
+    if (currentUserId() != user) throw StateError('Account changed');
+    _preparedUser = user;
+  }
 
   final SupabaseClient supabaseClient;
 
@@ -108,43 +169,51 @@ class AppDependencies {
 
   late final ItemRemoteDataSource itemRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return ItemRemoteDataSource(supabaseClient);
+    return LocalItemAdapter(
+      supabaseClient,
+      itemLocalDataSource,
+      privateRecords,
+    );
   })();
 
   late final CategoryRemoteDataSource categoryRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return CategoryRemoteDataSource(supabaseClient);
+    return LocalCategoryAdapter(supabaseClient, privateRecords);
   })();
 
   late final CashWalletRemoteDataSource cashWalletRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return CashWalletRemoteDataSource(supabaseClient);
+    return LocalCashAdapter(
+      supabaseClient,
+      moneyLocalDataSource,
+      privateRecords,
+    );
   })();
 
   late final ExpenseRemoteDataSource expenseRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return ExpenseRemoteDataSource(supabaseClient);
+    return LocalExpenseAdapter(supabaseClient, appDatabase, privateRecords);
   })();
 
   late final BudgetRemoteDataSource budgetRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return BudgetRemoteDataSource(supabaseClient);
+    return LocalBudgetAdapter(supabaseClient, privateRecords);
   })();
 
   late final RecurringExpenseRemoteDataSource recurringExpenseRemoteDataSource =
       (() {
-    final supabaseClient = this.supabaseClient;
-    return RecurringExpenseRemoteDataSource(supabaseClient);
-  })();
+        final supabaseClient = this.supabaseClient;
+        return LocalRecurringAdapter(supabaseClient, privateRecords);
+      })();
 
   late final AnalyticsRemoteDataSource analyticsRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return AnalyticsRemoteDataSource(supabaseClient);
+    return LocalAnalyticsAdapter(supabaseClient, privateRecords);
   })();
 
   late final AIRemoteDataSource aiRemoteDataSource = (() {
     final supabaseClient = this.supabaseClient;
-    return AIRemoteDataSource(supabaseClient);
+    return LocalAiAdapter(supabaseClient, privateRecords);
   })();
 
   late final BankRemoteDataSource bankRemoteDataSource = (() {
@@ -179,45 +248,59 @@ class AppDependencies {
     return AuthRepository(authDataSource);
   })();
 
-  late final transactionMovementReconciler =
-      TransactionMovementReconciler(moneyLocalDataSource);
+  late final transactionMovementReconciler = TransactionMovementReconciler(
+    moneyLocalDataSource,
+  );
 
   late final TransactionRepository transactionRepository =
       _transactionOverride ??
-          (() {
-            final remoteDataSource = transactionRemoteDataSource;
-            final localDataSource = transactionLocalDataSource;
-            final moneyLocal = moneyLocalDataSource;
-            return TransactionRepository(
-              remoteDataSource,
-              localDataSource,
-              moneyRemoteDataSource: moneyRemoteDataSource,
-              smsRemoteDataSource: smsRemoteDataSource,
-              deleteTransactionMovements:
-                  moneyLocal.deleteMovementsForTransaction,
-              detachSmsTransaction: smsMessageLocalDataSource.detachTransaction,
-              reconcileTransactionMovements:
-                  transactionMovementReconciler.reconcile,
-            );
-          })();
+      (() {
+        final remoteDataSource = transactionRemoteDataSource;
+        final localDataSource = transactionLocalDataSource;
+        final moneyLocal = moneyLocalDataSource;
+        return TransactionRepository(
+          remoteDataSource,
+          localDataSource,
+          activeUser: () => currentUserId(),
+          moneyRemoteDataSource: moneyRemoteDataSource,
+          smsRemoteDataSource: null,
+          deleteTransactionMovements: moneyLocal.deleteMovementsForTransaction,
+          detachSmsTransaction: smsMessageLocalDataSource.detachTransaction,
+          reconcileTransactionMovements:
+              transactionMovementReconciler.reconcile,
+        );
+      })();
 
   late final itemRepository = ItemRepository(
-      remoteDataSource: itemRemoteDataSource,
-      localDataSource: itemLocalDataSource);
+    remoteDataSource: itemRemoteDataSource,
+    localDataSource: itemLocalDataSource,
+  );
   late final expenseRepository = ExpenseRepository(
-      remoteDataSource: expenseRemoteDataSource,
-      localDataSource: expenseLocalDataSource);
-  late final categoryRepository =
-      CategoryRepository(remoteDataSource: categoryRemoteDataSource);
-  late final cashWalletRepository =
-      CashWalletRepository(remoteDataSource: cashWalletRemoteDataSource);
-  late final budgetRepository =
-      BudgetRepository(remoteDataSource: budgetRemoteDataSource);
+    remoteDataSource: expenseRemoteDataSource,
+    localDataSource: expenseLocalDataSource,
+  );
+  late final categoryRepository = CategoryRepository(
+    remoteDataSource: categoryRemoteDataSource,
+  );
+  late final cashWalletRepository = CashWalletRepository(
+    remoteDataSource: cashWalletRemoteDataSource,
+  );
+  late final budgetRepository = BudgetRepository(
+    remoteDataSource: budgetRemoteDataSource,
+  );
   late final recurringExpenseRepository = RecurringExpenseRepository(
-      remoteDataSource: recurringExpenseRemoteDataSource);
-  late final analyticsRepository =
-      AnalyticsRepository(remoteDataSource: analyticsRemoteDataSource);
+    remoteDataSource: recurringExpenseRemoteDataSource,
+  );
+  late final analyticsRepository = AnalyticsRepository(
+    remoteDataSource: analyticsRemoteDataSource,
+  );
   late final aiRepository = AIRepository(remoteDataSource: aiRemoteDataSource);
+  late final salaryRepository = LocalSalaryPlanRepository(
+    privateRecords,
+    transactionRepository,
+    smsMessageLocalDataSource,
+    moneyLocalDataSource,
+  );
   late final MoneyRepository moneyRepository = MoneyRepository(
     remote: moneyRemoteDataSource,
     local: moneyLocalDataSource,
@@ -226,19 +309,10 @@ class AppDependencies {
     expenseRepository: expenseRepository,
     detectedCardRepository: detectedCardRepository,
     smsMessageLocalDataSource: smsMessageLocalDataSource,
-    remoteCardIdWriter: (transactionId, cardId) async {
-      try {
-        await moneyRemoteDataSource
-            .updateTransactionCardId(transactionId, cardId)
-            .timeout(const Duration(seconds: 15));
-      } catch (error) {
-        logError('MONEY_CARD_ID_REMOTE_SYNC_FAILED id=$transactionId', error);
-      }
-    },
   );
 
   late final DetectedCardLocalDataSource detectedCardLocalDataSource = (() {
-    return DetectedCardLocalDataSource();
+    return DetectedCardLocalDataSource(records: privateRecords);
   })();
 
   late final DetectedCardRepository detectedCardRepository;
@@ -246,12 +320,11 @@ class AppDependencies {
   late final SMSTransactionProcessor smsTransactionProcessor = (() {
     final moneyRepo = moneyRepository;
     final detectedCardRepo = detectedCardRepository;
-    final smsRemote = smsRemoteDataSource;
     return SMSTransactionProcessor(
       exchangeService: EgpExchangeService(),
       moneyRepository: moneyRepo,
       detectedCardRepository: detectedCardRepo,
-      smsRemoteDataSource: smsRemote,
+      smsRemoteDataSource: null,
       bankSenderMappingStore: bankSenderMappingStore,
       // ROOT-CAUSE FIX (repeated SMS re-processing): the local processed-SMS
       // ledger MUST be injected. Without it `markProcessed` was never called in
@@ -268,15 +341,15 @@ class AppDependencies {
   late final SmsRemoteDataSource smsRemoteDataSource;
 
   late final BankSenderMappingStore bankSenderMappingStore = (() {
-    return BankSenderMappingStore();
+    return PrivateSenderMappingStore(privateRecords);
   })();
 
   late final SmsInboxService smsInboxService = (() {
-    return SmsInboxService();
+    return _inboxOverride ?? SmsInboxService();
   })();
 
   late final SmsSyncStateStore smsSyncStateStore = (() {
-    return SmsSyncStateStore();
+    return PrivateSmsSyncStateStore(privateRecords);
   })();
 
   late final SmsMessageLocalDataSource smsMessageLocalDataSource = (() {
@@ -289,10 +362,9 @@ class AppDependencies {
 
   late final SmsIngestionService smsIngestionService = (() {
     return SmsIngestionService(
-      importStart: SmsImportConfig.start,
       inboxService: smsInboxService,
       processor: smsTransactionProcessor,
-      smsRemoteDataSource: smsRemoteDataSource,
+      smsRemoteDataSource: null,
       processedSmsLocalDataSource: processedSmsLocalDataSource,
     );
   })();
@@ -300,7 +372,8 @@ class AppDependencies {
   late final SmsPollingService smsPollingService = (() {
     final service = SmsPollingService(
       ingestion: smsIngestionService,
-      resolveUserId: () async => currentUserId(),
+      resolveUserId: () async =>
+          _preparedUser == currentUserId() ? currentUserId() : null,
       resolveKnownBanks: () async {
         try {
           return await queries.getBanks();
@@ -367,7 +440,7 @@ class AppDependencies {
   })();
 
   late final ItemImageService itemImageService = (() {
-    return ItemImageService(supabaseClient);
+    return PrivateItemImageService(supabaseClient, privateRecords);
   })();
 
   late final ProfileRemoteDataSource profileRemoteDataSource = (() {
@@ -380,19 +453,24 @@ class AppDependencies {
     return UserProfileRepository(remoteDataSource: remote);
   })();
   AppRepositories repositories() => AppRepositories(
-      auth: accountRepository,
-      preferences: preferences,
-      biometrics: biometrics,
-      money: moneyRepository,
-      items: itemRepository,
-      cards: detectedCardRepository,
-      profile: profileRepository,
-      budgets: budgetRepository,
-      transactions: transactionRepository,
-      cash: cashWalletRepository,
-      queries: queries,
-      sms: smsRepository,
-      mappings: bankSenderMappingStore);
+    backup: backup,
+    categories: categoryRepository,
+    auth: accountRepository,
+    preferences: preferences,
+    biometrics: biometrics,
+    money: moneyRepository,
+    items: itemRepository,
+    cards: detectedCardRepository,
+    profile: profileRepository,
+    budgets: budgetRepository,
+    transactions: transactionRepository,
+    cash: cashWalletRepository,
+    queries: queries,
+    sms: smsRepository,
+    mappings: bankSenderMappingStore,
+    salary: salaryRepository,
+    prepareUser: prepareUser,
+  );
   Future<void> close() async {
     smsRepository.stop();
     await appDatabase.close();

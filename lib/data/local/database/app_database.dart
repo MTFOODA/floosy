@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 // Platform-specific database connection factory.
 import 'database_connection.dart';
+import 'private_tables.dart';
 
 part 'app_database.g.dart';
 
@@ -287,9 +288,10 @@ class ItemUsages extends Table {
 /// The raw message body is never stored — only the stable hash plus parsed
 /// metadata (same privacy rule as the remote sms_messages table).
 @TableIndex(
-    name: 'processed_sms_user_hash_unique',
-    columns: {#userId, #messageHash},
-    unique: true)
+  name: 'processed_sms_user_hash_unique',
+  columns: {#userId, #messageHash},
+  unique: true,
+)
 class ProcessedSmsMessages extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
@@ -308,9 +310,10 @@ class ProcessedSmsMessages extends Table {
 /// second detection system: it is the restart-safe local source for the same
 /// rows written remotely, including messages that need review.
 @TableIndex(
-    name: 'sms_messages_user_hash_unique',
-    columns: {#userId, #messageHash},
-    unique: true)
+  name: 'sms_messages_user_hash_unique',
+  columns: {#userId, #messageHash},
+  unique: true,
+)
 class SmsMessages extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text()();
@@ -346,61 +349,67 @@ class SmsMessages extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [
-  Transactions,
-  Expenses,
-  ExpenseItems,
-  Items,
-  Categories,
-  CashWallets,
-  CashMovements,
-  Budgets,
-  RecurringExpenses,
-  Alerts,
-  SyncQueue,
-  MonthlyIncomes,
-  BankAccounts,
-  BankMovements,
-  ItemUsages,
-  ProcessedSmsMessages,
-  SmsMessages,
-])
+@DriftDatabase(
+  tables: [
+    Transactions,
+    Expenses,
+    ExpenseItems,
+    Items,
+    Categories,
+    CashWallets,
+    CashMovements,
+    Budgets,
+    RecurringExpenses,
+    Alerts,
+    SyncQueue,
+    MonthlyIncomes,
+    BankAccounts,
+    BankMovements,
+    ItemUsages,
+    ProcessedSmsMessages,
+    SmsMessages,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   /// [executor] may be injected for tests (e.g. an in-memory
   /// [NativeDatabase]); the default opens the on-disk app database.
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.createTable(monthlyIncomes);
-            await m.createTable(bankAccounts);
-            await m.createTable(bankMovements);
-            await m.createTable(itemUsages);
-          }
-          // Add card_id column to existing transactions tables.
-          // This migration handles databases created before card-specific
-          // transaction tracking was introduced (schemaVersion 2 → 3).
-          if (from < 3) {
-            await m.addColumn(transactions, transactions.cardId);
-          }
-          // Local processed-SMS ledger (schemaVersion 3 → 4). New installs
-          // get the table via onCreate; existing installs get it here.
-          if (from < 4) {
-            await m.createTable(processedSmsMessages);
-          }
-          if (from < 5) {
-            await m.createTable(smsMessages);
-          }
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+      await createPrivateTables(this);
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(monthlyIncomes);
+        await m.createTable(bankAccounts);
+        await m.createTable(bankMovements);
+        await m.createTable(itemUsages);
+      }
+      // Add card_id column to existing transactions tables.
+      // This migration handles databases created before card-specific
+      // transaction tracking was introduced (schemaVersion 2 → 3).
+      if (from < 3) {
+        await m.addColumn(transactions, transactions.cardId);
+      }
+      // Local processed-SMS ledger (schemaVersion 3 → 4). New installs
+      // get the table via onCreate; existing installs get it here.
+      if (from < 4) {
+        await m.createTable(processedSmsMessages);
+      }
+      if (from < 5) {
+        await m.createTable(smsMessages);
+      }
+      if (from < 6) {
+        await createPrivateTables(this);
+      }
+    },
+  );
 
   static QueryExecutor _openConnection() {
     return openDatabaseConnection();

@@ -6,6 +6,14 @@ class AuthRepository {
 
   AuthRepository(this._remoteDataSource);
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _remoteDataSource.changePassword(
+    currentPassword: currentPassword,
+    newPassword: newPassword,
+  );
+
   Future<bool> signInWithGoogle() => _remoteDataSource.signInWithGoogle();
 
   Future<AuthResponse> signUp({
@@ -24,31 +32,22 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    return await _remoteDataSource.signIn(
-      email: email,
-      password: password,
-    );
+    return await _remoteDataSource.signIn(email: email, password: password);
   }
 
   Future<void> signOut() async {
     await _remoteDataSource.signOut();
   }
 
-  Future<void> resetPassword({
-    required String email,
-  }) async {
+  Future<void> resetPassword({required String email}) async {
     await _remoteDataSource.resetPassword(email: email);
   }
 
-  Future<void> resendConfirmationEmail({
-    required String email,
-  }) async {
+  Future<void> resendConfirmationEmail({required String email}) async {
     await _remoteDataSource.resendConfirmationEmail(email: email);
   }
 
-  Future<UserResponse> updatePassword({
-    required String newPassword,
-  }) async {
+  Future<UserResponse> updatePassword({required String newPassword}) async {
     return await _remoteDataSource.updatePassword(newPassword: newPassword);
   }
 

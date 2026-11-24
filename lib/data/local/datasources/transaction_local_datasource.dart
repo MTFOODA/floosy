@@ -4,11 +4,14 @@ import '../../../domain/entities/transaction_model.dart';
 
 class TransactionLocalDataSource {
   final db.AppDatabase _db;
+  db.AppDatabase get database => _db;
 
   TransactionLocalDataSource(this._db);
 
   Future<void> insertTransaction(Transaction transaction) async {
-    await _db.into(_db.transactions).insert(
+    await _db
+        .into(_db.transactions)
+        .insert(
           db.TransactionsCompanion(
             id: Value(transaction.id),
             userId: Value(transaction.userId),
@@ -35,13 +38,16 @@ class TransactionLocalDataSource {
   }
 
   Future<List<Transaction>> getTransactionsByUserId(String userId) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) => t.userId.equals(userId))
-          ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.transactionDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)
+              ..where((t) => t.userId.equals(userId))
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.transactionDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
 
     return rows.map((row) => _mapRowToTransaction(row)).toList();
   }
@@ -50,18 +56,20 @@ class TransactionLocalDataSource {
     String userId,
     String fingerprint,
   ) async {
-    final row = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) & t.fingerprint.equals(fingerprint)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) & t.fingerprint.equals(fingerprint),
+            ))
+            .getSingleOrNull();
 
     return row != null ? _mapRowToTransaction(row) : null;
   }
 
   Future<void> updateTransaction(Transaction transaction) async {
-    await (_db.update(_db.transactions)
-          ..where((t) => t.id.equals(transaction.id)))
-        .write(
+    await (_db.update(
+      _db.transactions,
+    )..where((t) => t.id.equals(transaction.id))).write(
       db.TransactionsCompanion(
         bankId: Value(transaction.bankId),
         categoryId: Value(transaction.categoryId),
@@ -86,7 +94,9 @@ class TransactionLocalDataSource {
 
   /// Updates only the card_id field for a transaction.
   Future<void> updateTransactionCardId(
-      String transactionId, String cardId) async {
+    String transactionId,
+    String cardId,
+  ) async {
     await (_db.update(_db.transactions)
           ..where((t) => t.id.equals(transactionId)))
         .write(db.TransactionsCompanion(cardId: Value(cardId)));
@@ -107,13 +117,15 @@ class TransactionLocalDataSource {
     required String? cardId,
     required String? cardLast4,
   }) async {
-    await (_db.update(_db.transactions)
-          ..where((t) => t.id.equals(transactionId)))
-        .write(db.TransactionsCompanion(
-      cardId: Value(cardId),
-      cardLast4: Value(cardLast4),
-      updatedAt: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.transactions,
+    )..where((t) => t.id.equals(transactionId))).write(
+      db.TransactionsCompanion(
+        cardId: Value(cardId),
+        cardLast4: Value(cardLast4),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -125,13 +137,16 @@ class TransactionLocalDataSource {
     String userId,
     String cardId,
   ) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) => t.userId.equals(userId) & t.cardId.equals(cardId))
-          ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.transactionDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)
+              ..where((t) => t.userId.equals(userId) & t.cardId.equals(cardId))
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.transactionDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
 
     return rows.map((row) => _mapRowToTransaction(row)).toList();
   }
@@ -146,18 +161,20 @@ class TransactionLocalDataSource {
     final startDate = DateTime(year, month, 1);
     final endDate = DateTime(year, month + 1, 1);
 
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.cardId.equals(cardId) &
-              t.transactionDate.isBiggerOrEqualValue(startDate) &
-              t.transactionDate.isSmallerThanValue(endDate) &
-              t.type.isIn([
-                TransactionType.purchase.toString(),
-                TransactionType.cash_expense.toString(),
-                TransactionType.transfer_out.toString(),
-              ])))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.cardId.equals(cardId) &
+                  t.transactionDate.isBiggerOrEqualValue(startDate) &
+                  t.transactionDate.isSmallerThanValue(endDate) &
+                  t.type.isIn([
+                    TransactionType.purchase.toString(),
+                    TransactionType.cash_expense.toString(),
+                    TransactionType.transfer_out.toString(),
+                  ]),
+            ))
+            .get();
 
     return rows.fold<int>(0, (sum, row) => sum + row.amountMinor);
   }
@@ -172,14 +189,16 @@ class TransactionLocalDataSource {
     final startDate = DateTime(year, month, 1);
     final endDate = DateTime(year, month + 1, 1);
 
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.cardId.equals(cardId) &
-              t.transactionDate.isBiggerOrEqualValue(startDate) &
-              t.transactionDate.isSmallerThanValue(endDate) &
-              t.type.equals(TransactionType.atm_withdrawal.toString())))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.cardId.equals(cardId) &
+                  t.transactionDate.isBiggerOrEqualValue(startDate) &
+                  t.transactionDate.isSmallerThanValue(endDate) &
+                  t.type.equals(TransactionType.atm_withdrawal.toString()),
+            ))
+            .get();
 
     return rows.fold<int>(0, (sum, row) => sum + row.amountMinor);
   }
@@ -192,16 +211,21 @@ class TransactionLocalDataSource {
     final startDate = DateTime(year, month, 1);
     final endDate = DateTime(year, month + 1, 1);
 
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.transactionDate.isBiggerOrEqualValue(startDate) &
-              t.transactionDate.isSmallerThanValue(endDate))
-          ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.transactionDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)
+              ..where(
+                (t) =>
+                    t.userId.equals(userId) &
+                    t.transactionDate.isBiggerOrEqualValue(startDate) &
+                    t.transactionDate.isSmallerThanValue(endDate),
+              )
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.transactionDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
 
     return rows.map((row) => _mapRowToTransaction(row)).toList();
   }
@@ -218,20 +242,25 @@ class TransactionLocalDataSource {
   }) async {
     Expression<bool> expr = _db.transactions.userId.equals(userId);
     if (startDateTime != null) {
-      expr = expr &
+      expr =
+          expr &
           _db.transactions.transactionDate.isBiggerOrEqualValue(startDateTime);
     }
     if (endDateTime != null) {
-      expr = expr &
+      expr =
+          expr &
           _db.transactions.transactionDate.isSmallerOrEqualValue(endDateTime);
     }
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) => expr)
-          ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.transactionDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)
+              ..where((t) => expr)
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.transactionDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
 
     return rows.map((row) => _mapRowToTransaction(row)).toList();
   }

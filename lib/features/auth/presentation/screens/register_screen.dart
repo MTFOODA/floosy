@@ -56,9 +56,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _errorMessage = null;
     });
     try {
-      await context
-          .read<AuthCubit>()
-          .signUp(email: email, password: password, fullName: name);
+      await context.read<AuthCubit>().signUp(
+        email: email,
+        password: password,
+        fullName: name,
+      );
       // full_name is already sent in signup metadata. Without a confirmed
       // session, RLS cannot permit a profile update; the signup trigger owns
       // initial profile creation.
@@ -70,8 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _errorMessage = '${l['registrationFailed']}: ${e.toString()}');
+        setState(() => _errorMessage = l['registrationFailed']);
       }
     }
   }
@@ -84,27 +85,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: context.fc.primarySurface,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium)),
-        title: Text(l['emailConfirmationRequired'],
-            style: TextStyle(color: context.fc.textPrimary)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
+        ),
+        title: Text(
+          l['emailConfirmationRequired'],
+          style: TextStyle(color: context.fc.textPrimary),
+        ),
         content: Text(
-            l['emailConfirmationMessage'].replaceAll('{email}', email),
-            style: TextStyle(color: context.fc.textSecondary)),
+          l['emailConfirmationMessage'].replaceAll('{email}', email),
+          style: TextStyle(color: context.fc.textSecondary),
+        ),
         actions: [
           TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                context.go(AppRoutes.login);
-              },
-              child: Text(l['backToLogin'],
-                  style: const TextStyle(color: FloosyDesign.brightPurple))),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.go(AppRoutes.login);
+            },
+            child: Text(
+              l['backToLogin'],
+              style: const TextStyle(color: FloosyDesign.brightPurple),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildField(TextEditingController ctrl, String hint, IconData icon,
-      {TextInputType? keyboardType}) {
+  Widget _buildField(
+    TextEditingController ctrl,
+    String hint,
+    IconData icon, {
+    TextInputType? keyboardType,
+  }) {
     return TextField(
       controller: ctrl,
       keyboardType: keyboardType,
@@ -115,18 +127,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         prefixIcon: Icon(icon, color: context.fc.textMuted, size: 22),
         filled: true,
         fillColor: context.fc.inputBackground,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 22,
+          vertical: 20,
+        ),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: BorderSide(color: context.fc.inputBorder)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: BorderSide(color: context.fc.inputBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: BorderSide(color: context.fc.inputBorder)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: BorderSide(color: context.fc.inputBorder),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: const BorderSide(
-                color: FloosyDesign.primaryPurple, width: 1.5)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: const BorderSide(
+            color: FloosyDesign.primaryPurple,
+            width: 1.5,
+          ),
+        ),
       ),
     );
   }
@@ -140,31 +159,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
       decoration: InputDecoration(
         hintText: l['passwordHint'],
         hintStyle: TextStyle(color: context.fc.textMuted, fontSize: 15),
-        prefixIcon: Icon(Icons.lock_outline_rounded,
-            color: context.fc.textMuted, size: 22),
+        prefixIcon: Icon(
+          Icons.lock_outline_rounded,
+          color: context.fc.textMuted,
+          size: 22,
+        ),
         suffixIcon: IconButton(
-            icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                color: context.fc.textMuted,
-                size: 22),
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword)),
+          icon: Icon(
+            _obscurePassword
+                ? Icons.visibility_off_rounded
+                : Icons.visibility_rounded,
+            color: context.fc.textMuted,
+            size: 22,
+          ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
         filled: true,
         fillColor: context.fc.inputBackground,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 22,
+          vertical: 20,
+        ),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: BorderSide(color: context.fc.inputBorder)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: BorderSide(color: context.fc.inputBorder),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: BorderSide(color: context.fc.inputBorder)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: BorderSide(color: context.fc.inputBorder),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
-            borderSide: const BorderSide(
-                color: FloosyDesign.primaryPurple, width: 1.5)),
+          borderRadius: BorderRadius.circular(FloosyDesign.radiusInput),
+          borderSide: const BorderSide(
+            color: FloosyDesign.primaryPurple,
+            width: 1.5,
+          ),
+        ),
       ),
     );
   }
@@ -180,10 +210,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: _isLoading
-                ? LinearGradient(colors: [
-                    context.fc.elevatedSurface,
-                    context.fc.elevatedSurface
-                  ])
+                ? LinearGradient(
+                    colors: [
+                      context.fc.elevatedSurface,
+                      context.fc.elevatedSurface,
+                    ],
+                  )
                 : FloosyDesign.purpleGradient,
             borderRadius: BorderRadius.circular(FloosyDesign.radiusButton),
           ),
@@ -193,14 +225,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 24,
                     width: 24,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor:
-                            AlwaysStoppedAnimation(context.fc.textPrimary)))
-                : Text(l['signup'],
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation(
+                        context.fc.textPrimary,
+                      ),
+                    ),
+                  )
+                : Text(
+                    l['signup'],
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: context.fc.textPrimary)),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: context.fc.textPrimary,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -215,8 +253,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: context.fc.authBackground,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: FloosyDesign.horizontalPadding(context)
-              .copyWith(top: 20, bottom: 32),
+          padding: FloosyDesign.horizontalPadding(
+            context,
+          ).copyWith(top: 20, bottom: 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -232,20 +271,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
                     color: context.fc.logoutBg,
-                    borderRadius:
-                        BorderRadius.circular(FloosyDesign.radiusSmall),
+                    borderRadius: BorderRadius.circular(
+                      FloosyDesign.radiusSmall,
+                    ),
                     border: Border.all(color: context.fc.logoutBorder),
                   ),
-                  child: Text(_errorMessage!,
-                      style: const TextStyle(
-                          color: FloosyDesign.negative, fontSize: 13)),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: FloosyDesign.negative,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               _buildField(
-                  _nameController, l['fullName'], Icons.person_outline_rounded),
+                _nameController,
+                l['fullName'],
+                Icons.person_outline_rounded,
+              ),
               const SizedBox(height: 16),
               _buildField(
-                  _emailController, 'ahmed@example.com', Icons.alternate_email,
-                  keyboardType: TextInputType.emailAddress),
+                _emailController,
+                'ahmed@example.com',
+                Icons.alternate_email,
+                keyboardType: TextInputType.emailAddress,
+              ),
               const SizedBox(height: 16),
               _buildPasswordField(),
               const SizedBox(height: 28),
@@ -260,10 +310,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(l['alreadyHaveAccount'], style: context.fc.bodyText),
                     GestureDetector(
                       onTap: () => context.go(AppRoutes.login),
-                      child: Text(l['login'],
-                          style: context.fc.bodyText.copyWith(
-                              color: FloosyDesign.brightPurple,
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        l['login'],
+                        style: context.fc.bodyText.copyWith(
+                          color: FloosyDesign.brightPurple,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),

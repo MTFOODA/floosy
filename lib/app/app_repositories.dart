@@ -9,9 +9,15 @@ import '../domain/repositories/transaction_repository.dart';
 import '../domain/repositories/cash_wallet_repository.dart';
 import '../domain/repositories/financial_queries_repository.dart';
 import '../domain/repositories/sms_repository.dart';
+import '../domain/repositories/backup_repository.dart';
+import '../domain/repositories/category_repository.dart';
+import '../domain/repositories/salary_plan_repository.dart';
 
 /// Explicit injection seam shared by production and tests.
 class AppRepositories {
+  final BackupRepository? backup;
+  final CategoryRepository? categories;
+  final Future<void> Function(String userId)? prepareUser;
   final AccountRepository auth;
   final AppPreferencesRepository preferences;
   final BiometricRepository biometrics;
@@ -25,18 +31,24 @@ class AppRepositories {
   final FinancialQueriesRepository queries;
   final SmsRepository sms;
   final BankMappingsRepository mappings;
-  const AppRepositories(
-      {required this.auth,
-      required this.preferences,
-      required this.biometrics,
-      required this.money,
-      required this.items,
-      required this.cards,
-      required this.profile,
-      required this.budgets,
-      required this.transactions,
-      required this.cash,
-      required this.queries,
-      required this.sms,
-      required this.mappings});
+  final SalaryPlanRepository salary;
+  const AppRepositories({
+    this.backup,
+    this.categories,
+    this.prepareUser,
+    required this.auth,
+    required this.preferences,
+    required this.biometrics,
+    required this.money,
+    required this.items,
+    required this.cards,
+    required this.profile,
+    required this.budgets,
+    required this.transactions,
+    required this.cash,
+    required this.queries,
+    required this.sms,
+    required this.mappings,
+    required this.salary,
+  });
 }

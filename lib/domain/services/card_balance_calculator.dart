@@ -156,7 +156,10 @@ class CardBalance {
 
     if (!card.isCreditCard) {
       return CardBalance(
-        myBalanceMinor: ledger,
+        // A debit card may have an opening balance set by the user. Every
+        // transaction stays ledger-driven from that point onward, so a debit,
+        // credit, transfer or ATM withdrawal updates the same real balance.
+        myBalanceMinor: card.currentBalanceMinor + ledger,
         deductedMinor: deducted,
         pocketCashMinor: pocketCash,
       );

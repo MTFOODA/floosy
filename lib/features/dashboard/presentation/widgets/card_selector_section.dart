@@ -1,3 +1,5 @@
+import '../../../../core/widgets/common/bank_logo.dart';
+import '../../../../domain/entities/bank_directory.dart';
 import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,37 +32,48 @@ class DetectedCardsSection extends StatelessWidget {
         if (cards.isEmpty) return const SizedBox.shrink();
 
         if (compact) {
-          return Row(children: [
-            Expanded(
+          return Row(
+            children: [
+              Expanded(
                 child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: [
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
                       for (final card in cards)
                         Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 8),
-                            child: ChoiceChip(
-                              selected:
-                                  _isSelected(context, card, selectedLast4),
-                              selectedColor: card.appearance.colors.last
-                                  .withValues(alpha: .22),
-                              avatar: Icon(Icons.credit_card_rounded,
-                                  size: 17, color: card.appearance.colors.last),
-                              label: Text(
-                                  '${card.bankName ?? l['yourCards']}  •• ${card.last4}',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.fc.textPrimary)),
-                              onSelected: (_) => context
-                                  .read<SelectedCardCubit>()
-                                  .setSelectedCard(card.last4,
-                                      bankName: card.bankName),
-                            )),
-                    ]))),
-            IconButton(
+                          padding: const EdgeInsetsDirectional.only(end: 8),
+                          child: ChoiceChip(
+                            showCheckmark: false,
+                            selected: _isSelected(context, card, selectedLast4),
+                            selectedColor: card.appearance.colors.last
+                                .withValues(alpha: .22),
+                            avatar: BankLogo(bankName: card.bankName, size: 22),
+                            label: Text(
+                              '${card.bankName == null ? l['yourCards'] : BankCatalog.displayName(card.bankName, arabic: l.isArabic)}  •• ${card.last4}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.fc.textPrimary,
+                              ),
+                            ),
+                            onSelected: (_) => context
+                                .read<SelectedCardCubit>()
+                                .setSelectedCard(
+                                  card.last4,
+                                  bankName: card.bankName,
+                                ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
                 tooltip: l['manageCards'],
                 onPressed: () => context.push(AppRoutes.detectedCards),
-                icon: const Icon(Icons.tune_rounded, size: 20)),
-          ]);
+                icon: const Icon(Icons.tune_rounded, size: 20),
+              ),
+            ],
+          );
         }
 
         return Column(
@@ -105,7 +118,10 @@ class DetectedCardsSection extends StatelessWidget {
     String? selectedLast4,
   ) {
     final isSelected = _isSelected(context, card, selectedLast4);
-    return _buildCardItem(context, l, card, isSelected, scale: 1.0);
+    return SizedBox(
+      width: 220,
+      child: _buildCardItem(context, l, card, isSelected, scale: 1.0),
+    );
   }
 
   /// Dynamically adapts the layout to the actual number of detected cards:
@@ -123,50 +139,22 @@ class DetectedCardsSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 20),
           child: Text(
             l['noCardsDetected'],
-            style: TextStyle(
-              color: context.fc.textSecondary,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: context.fc.textSecondary, fontSize: 14),
           ),
         ),
       );
     }
 
     if (cards.length == 1) {
-      return _buildSingleCard(
-        context,
-        l,
-        cards.first,
-        selectedLast4,
-      );
+      return _buildSingleCard(context, l, cards.first, selectedLast4);
     } else if (cards.length == 2) {
-      return _buildTwoCards(
-        context,
-        l,
-        cards,
-        selectedLast4,
-      );
+      return _buildTwoCards(context, l, cards, selectedLast4);
     } else if (cards.length == 3) {
-      return _buildThreeCards(
-        context,
-        l,
-        cards,
-        selectedLast4,
-      );
+      return _buildThreeCards(context, l, cards, selectedLast4);
     } else if (cards.length == 4) {
-      return _buildFourCards(
-        context,
-        l,
-        cards,
-        selectedLast4,
-      );
+      return _buildFourCards(context, l, cards, selectedLast4);
     } else {
-      return _buildScrollableCards(
-        context,
-        l,
-        cards,
-        selectedLast4,
-      );
+      return _buildScrollableCards(context, l, cards, selectedLast4);
     }
   }
 
@@ -268,7 +256,10 @@ class DetectedCardsSection extends StatelessWidget {
   }
 
   bool _isSelected(
-      BuildContext context, DetectedCard card, String? selectedLast4) {
+    BuildContext context,
+    DetectedCard card,
+    String? selectedLast4,
+  ) {
     final selection = context.read<SelectedCardCubit>().state;
     if (selection.requiresChoice) return false;
     final selectedBankName = selection.bankName;
@@ -291,9 +282,10 @@ class DetectedCardsSection extends StatelessWidget {
         card: card,
         isSelected: isSelected,
         onTap: () {
-          context
-              .read<SelectedCardCubit>()
-              .setSelectedCard(card.last4, bankName: card.bankName);
+          context.read<SelectedCardCubit>().setSelectedCard(
+            card.last4,
+            bankName: card.bankName,
+          );
         },
       ),
     );

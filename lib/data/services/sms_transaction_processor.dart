@@ -68,6 +68,13 @@ class SMSTransactionProcessor {
     String? overrideAccountId,
     DateTime? receivedAt,
   }) async {
+    // Never create a card, transaction or balance movement from an offer.
+    if (SMSParser.isPromotional(smsContent)) return false;
+    if (sender != null &&
+        bankSenderMappingStore != null &&
+        await bankSenderMappingStore!.isRejected(userId, sender)) {
+      return false;
+    }
     final parsed = await SMSParser.parse(
       smsContent: smsContent,
       sender: sender,
@@ -89,12 +96,14 @@ class SMSTransactionProcessor {
     var bankName = parsed.bankName;
     var hasIdentifiedBank =
         (parsed.bankId != null && parsed.bankId!.isNotEmpty) ||
-            (bankName != null && bankName.trim().isNotEmpty);
+        (bankName != null && bankName.trim().isNotEmpty);
     if (!hasIdentifiedBank &&
         bankSenderMappingStore != null &&
         (sender ?? '').trim().isNotEmpty) {
-      final mapped =
-          await bankSenderMappingStore!.getBankForSender(userId, sender!);
+      final mapped = await bankSenderMappingStore!.getBankForSender(
+        userId,
+        sender!,
+      );
       if (mapped != null) {
         bankName = mapped;
         hasIdentifiedBank = true;
@@ -110,8 +119,10 @@ class SMSTransactionProcessor {
         // those are legitimate financial messages and must never be discarded
         // just because no manual mapping exists yet.
         await bankSenderMappingStore!.markUnknown(userId, sender);
-        logInfo('SMS_BANK_UNKNOWN sender=$sender â€” not a validated bank '
-            'sender; skipped (pending manual assignment)');
+        logInfo(
+          'SMS_BANK_UNKNOWN sender=$sender â€” not a validated bank '
+          'sender; skipped (pending manual assignment)',
+        );
         return false;
       }
     } else if (hasIdentifiedBank) {
@@ -133,8 +144,10 @@ class SMSTransactionProcessor {
         )) {
       bankName = _walletDisplayName(sender);
       hasIdentifiedBank = true;
-      logInfo('SMS_BANK_IDENTIFIED via recognized wallet/sender identifier: '
-          '$sender â†’ $bankName');
+      logInfo(
+        'SMS_BANK_IDENTIFIED via recognized wallet/sender identifier: '
+        '$sender â†’ $bankName',
+      );
     }
 
     if (!hasIdentifiedBank) {
@@ -242,8 +255,10 @@ class SMSTransactionProcessor {
       );
       if (learned != null) {
         detectedCard = learned;
-        logInfo('SMS_CARD_LEARNED_HIT last4=${parsed.cardLast4} '
-            'bank=$bankName -> card=${learned.id}');
+        logInfo(
+          'SMS_CARD_LEARNED_HIT last4=${parsed.cardLast4} '
+          'bank=$bankName -> card=${learned.id}',
+        );
       } else {
         detectedCard = await _upsertDetectedCard(
           userId: userId,
@@ -251,8 +266,10 @@ class SMSTransactionProcessor {
           bankName: bankName,
         );
         if (detectedCard == null) {
-          logInfo('SMS_CARD_UNRESOLVED last4=${parsed.cardLast4} '
-              'bank=$bankName -> transaction stays unassigned');
+          logInfo(
+            'SMS_CARD_UNRESOLVED last4=${parsed.cardLast4} '
+            'bank=$bankName -> transaction stays unassigned',
+          );
         }
       }
     }
@@ -270,7 +287,10 @@ class SMSTransactionProcessor {
     if (parsed.amountMinor == null) {
       logWarning('TRANSACTION_SKIPPED hash=$messageHash reason=amount');
       await _updateDetectionStatus(
-          localDetection, remoteDetectionRecord, 'needs_review');
+        localDetection,
+        remoteDetectionRecord,
+        'needs_review',
+      );
       return false;
     }
 
@@ -286,7 +306,10 @@ class SMSTransactionProcessor {
     if (type == null) {
       logWarning('TRANSACTION_SKIPPED hash=$messageHash reason=type');
       await _updateDetectionStatus(
-          localDetection, remoteDetectionRecord, 'needs_review');
+        localDetection,
+        remoteDetectionRecord,
+        'needs_review',
+      );
       return false;
     }
 
@@ -299,8 +322,10 @@ class SMSTransactionProcessor {
     // allowed: the transaction still remains visible and can be linked later.
     String? accountId = overrideAccountId;
     try {
-      accountId ??=
-          await _resolveAccountId(userId, bankId).timeout(smsRecordTimeout);
+      accountId ??= await _resolveAccountId(
+        userId,
+        bankId,
+      ).timeout(smsRecordTimeout);
     } on TimeoutException catch (e) {
       logError('SMS_ACCOUNT_LOOKUP_TIMEOUT proceeding without account', e);
     }
@@ -312,8 +337,11 @@ class SMSTransactionProcessor {
     var status = TransactionStatus.confirmed;
     String? notes;
     if (currency != 'EGP' && exchangeService != null) {
-      final converted = await exchangeService!
-          .convert(amountMinor, currency, transactionDate);
+      final converted = await exchangeService!.convert(
+        amountMinor,
+        currency,
+        transactionDate,
+      );
       if (converted == null) {
         status = TransactionStatus.pending;
         notes =
@@ -357,7 +385,10 @@ class SMSTransactionProcessor {
     // relationship only after the authoritative money-ledger write succeeds.
     if (recorded) {
       await _completeDetection(
-          localDetection, remoteDetectionRecord, transaction.id);
+        localDetection,
+        remoteDetectionRecord,
+        transaction.id,
+      );
       logInfo('TRANSACTION_CREATED id=${transaction.id} source=sms');
     } else {
       logInfo('TRANSACTION_SKIPPED id=${transaction.id} reason=duplicate');
@@ -382,10 +413,11 @@ class SMSTransactionProcessor {
         );
       } catch (e) {
         logError(
-            'SMS_MARK_PROCESSED_FAILED hash=$messageHash â€” transaction '
-            'persisted but ledger update failed (safe: will be re-checked on '
-            'next scan)',
-            e);
+          'SMS_MARK_PROCESSED_FAILED hash=$messageHash â€” transaction '
+          'persisted but ledger update failed (safe: will be re-checked on '
+          'next scan)',
+          e,
+        );
       }
     }
 
@@ -401,17 +433,15 @@ class SMSTransactionProcessor {
     // (dedupe-safe). The Card -> Transaction link is already part of the
     // transaction row itself (stamped at creation above), so there is no
     // detached re-link to run here â€” only the denormalised counter is bumped,
-    // off the critical path so a slow write never stalls the SMS scan.
+    // completed before the scan settles, so backup/restore can await all writes.
     if (recorded && detectedCard != null) {
       final countedCard = detectedCard;
-      unawaited(() async {
-        await _upsertDetectedCard(
-          userId: userId,
-          last4: countedCard.last4,
-          bankName: countedCard.bankName,
-          transactionCountDelta: 1,
-        );
-      }());
+      await _upsertDetectedCard(
+        userId: userId,
+        last4: countedCard.last4,
+        bankName: countedCard.bankName,
+        transactionCountDelta: 1,
+      );
     }
 
     return recorded;
@@ -435,11 +465,13 @@ class SMSTransactionProcessor {
     if (smsRemoteDataSource == null || remoteRecord == null) return;
     try {
       await smsRemoteDataSource!
-          .updateSmsMessage(remoteRecord.copyWith(
-            transactionId: transactionId,
-            processingStatus: 'processed',
-            processedAt: DateTime.now().toUtc(),
-          ))
+          .updateSmsMessage(
+            remoteRecord.copyWith(
+              transactionId: transactionId,
+              processingStatus: 'processed',
+              processedAt: DateTime.now().toUtc(),
+            ),
+          )
           .timeout(smsRecordTimeout);
       logInfo('SMS_MESSAGE_LINKED transaction=$transactionId');
     } catch (e) {
@@ -453,8 +485,9 @@ class SMSTransactionProcessor {
     String status,
   ) async {
     try {
-      await smsMessageLocalDataSource
-          ?.upsert(localRecord.copyWith(processingStatus: status));
+      await smsMessageLocalDataSource?.upsert(
+        localRecord.copyWith(processingStatus: status),
+      );
     } catch (e) {
       logError('SMS_LOCAL_DETECTION_STATUS_UPDATE_FAILED status=$status', e);
     }

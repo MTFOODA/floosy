@@ -3,129 +3,8 @@ import 'package:crypto/crypto.dart';
 import '../../domain/entities/transaction_model.dart';
 import '../../domain/entities/user_model.dart';
 
-/// A lightweight bank identity used for sender/text matching without
-/// depending on database-generated ids (the DB assigns real uuids).
-class KnownBank {
-  final String code;
-  final String name;
-  final String nameAr;
-
-  /// Additional legitimate sender/body spellings used by real bank SMS.
-  /// These are aliases only; [name] remains the persisted display identity.
-  final List<String> aliases;
-  const KnownBank({
-    required this.code,
-    required this.name,
-    required this.nameAr,
-    this.aliases = const [],
-  });
-}
-
-/// Static catalog of Egyptian banks used for offline sender/body detection.
-/// The remote catalog (from Supabase) is preferred when available; this list
-/// guarantees detection works even before the first sync.
-class BankCatalog {
-  static const List<KnownBank> banks = [
-    KnownBank(
-        code: 'CIB',
-        name: 'Commercial International Bank',
-        nameAr: 'البنك التجاري الدولي'),
-    KnownBank(
-        code: 'NBE',
-        name: 'National Bank of Egypt',
-        nameAr: 'البنك الأهلي المصري'),
-    KnownBank(code: 'MISR', name: 'Banque Misr', nameAr: 'بنك مصر'),
-    KnownBank(code: 'QNB', name: 'QNB Egypt', nameAr: 'بنك قطر الوطني مصر'),
-    KnownBank(
-        code: 'ALEX',
-        name: 'AlexBank',
-        nameAr: 'بنك الإسكندرية',
-        aliases: [
-          'bank of alexandria',
-          'alex bank',
-          'alexbank',
-          'ab magnifica',
-          'ab private',
-          '4988'
-        ]),
-    KnownBank(code: 'HSBC', name: 'HSBC Egypt', nameAr: 'بنك HSBC مصر'),
-    KnownBank(
-        code: 'ADIB',
-        name: 'Abu Dhabi Islamic Bank',
-        nameAr: 'مصرف أبوظبي الإسلامي'),
-    KnownBank(
-        code: 'ENBD', name: 'Emirates NBD', nameAr: 'بنك الإمارات دبي الوطني'),
-    KnownBank(code: 'FAB', name: 'FAB Egypt', nameAr: 'البنك الأول بأبو ظبي'),
-    KnownBank(
-        code: 'AAIB',
-        name: 'Arab African International Bank',
-        nameAr: 'العربي الأفريقي الدولي'),
-    KnownBank(code: 'FAISAL', name: 'Faisal Bank', nameAr: 'بنك فيصل'),
-  ];
-
-  /// Best-effort match against the static catalog.
-  static KnownBank? match(String? sender, String body) {
-    final text = '${sender ?? ''} $body'.toLowerCase();
-    final senderLower = (sender ?? '').toLowerCase();
-    for (final bank in banks) {
-      if (_matches(text, bank, senderLower)) return bank;
-    }
-    return null;
-  }
-
-  static bool _matches(String text, KnownBank bank, String senderLower) {
-    final lowerCode = bank.code.toLowerCase();
-    final lowerName = bank.name.toLowerCase();
-    final lowerNameAr = bank.nameAr.toLowerCase();
-    // Direct substring match over sender + body.
-    if (text.contains(lowerCode) ||
-        text.contains(lowerName) ||
-        text.contains(lowerNameAr) ||
-        bank.aliases.any((alias) => RegExp(r'^\d+$').hasMatch(alias)
-            ? senderLower == alias
-            : text.contains(alias.toLowerCase()))) {
-      return true;
-    }
-    // Sender-only token match: catches senders like "FAISAL BANK" whose
-    // name token is not an exact catalog substring. This is applied ONLY
-    // to the sender field — never to the body — so arbitrary message words
-    // (e.g. "bank" in "Other bank message") cannot create false positives.
-    if (senderLower.isNotEmpty) {
-      final tokens = senderLower
-          .replaceAll(RegExp(r'[^a-z0-9\u0600-\u06FF]'), ' ')
-          .trim()
-          .split(RegExp(r'\s+'));
-      for (final token in tokens) {
-        if (token.length < 3) continue;
-        // Skip generic English stop words unless the token matches the
-        // bank code directly. Generic words like "bank", "of", "the" etc.
-        // match against ALL banks that have those words in their English
-        // name, defeating the purpose of bank-specific recognition.
-        const stopWords = {
-          'bank',
-          'of',
-          'the',
-          'and',
-          'international',
-          'national',
-          'commercial',
-          'banking',
-          'egypt',
-        };
-        if (stopWords.contains(token) &&
-            token != lowerCode &&
-            !token.contains(lowerCode) &&
-            !lowerCode.contains(token)) {
-          continue;
-        }
-        if (lowerName.contains(token) || token.contains(lowerCode)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-}
+import '../../domain/entities/bank_directory.dart';
+export '../../domain/entities/bank_directory.dart';
 
 /// Result of parsing a bank SMS.
 class ParsedSms {
@@ -203,10 +82,16 @@ class SMSParser {
   ///
   /// Uses the BankCatalog and remote bank data for recognition. A sender is
   /// recognized when it matches a known bank code, name, or Arabic name.
-  static bool isSupportedSender(String? sender,
-      {List<Bank> knownBanks = const [], String? body}) {
+  static bool isSupportedSender(
+    String? sender, {
+    List<Bank> knownBanks = const [],
+    String? body,
+  }) {
     return isRecognizedBankOrWalletSender(
-        sender: sender, knownBanks: knownBanks, body: body);
+      sender: sender,
+      knownBanks: knownBanks,
+      body: body,
+    );
   }
 
   /// Message-date gate (requirement: NO date cutoff).
@@ -284,27 +169,9 @@ class SMSParser {
       }
     }
 
-    // 3. Check for well-known wallet/transfer identifiers that may not
-    //    be in the bank catalog but are financial services.
-    final financialSenderPatterns = [
-      'instapay',
-      'ipn',
-      'vodafone cash',
-      'vodafonecash',
-      'vodafonec',
-      'orange cash',
-      'orangecash',
-      'etisalat cash',
-      'etisalatcash',
-      'we pay',
-      'wepay',
-      'mobile wallet',
-    ];
-    for (final pattern in financialSenderPatterns) {
-      if (senderLower.contains(pattern)) return true;
-    }
-
-    return false;
+    // Named wallet providers are in the same exact-identity directory above.
+    // Do not accept an arbitrary sender merely containing a provider name.
+    return BankCatalog.normalize(sender) == 'mobilewallet';
   }
 
   /// True when [body] carries the FULL bank name (English or Arabic) of
@@ -322,49 +189,20 @@ class SMSParser {
 
   /// Static-catalog variant of [_bodyCarriesBankName] (offline fallback).
   static String? _bodyStaticBankName(String body) {
-    final text = body.toLowerCase();
-    for (final bank in BankCatalog.banks) {
-      final name = bank.name.toLowerCase();
-      if (name.length >= 6 && text.contains(name)) return bank.name;
-      final nameAr = bank.nameAr.toLowerCase();
-      if (nameAr.length >= 4 && text.contains(nameAr)) return bank.name;
-      if (bank.aliases.any((alias) =>
-          !RegExp(r'^\d+$').hasMatch(alias) &&
-          text.contains(alias.toLowerCase()))) {
-        return bank.name;
-      }
-    }
-    return null;
+    return BankCatalog.match(null, body)?.name;
   }
 
   static bool _senderMatchesBank(String senderLower, Bank bank) {
-    final code = (bank.code ?? '').toLowerCase();
-    final name = bank.name.toLowerCase();
-    final nameAr = (bank.nameAr ?? '').toLowerCase();
-
-    // Direct code match (e.g., "CIB", "NBE", "FAISAL").
-    if (code.isNotEmpty && senderLower.contains(code)) return true;
-    // Bank name token in sender (e.g., "Faisal Bank" contains "faisal").
-    if (name.isNotEmpty) {
-      final tokens = senderLower
-          .replaceAll(RegExp(r'[^a-z0-9]'), ' ')
-          .trim()
-          .split(RegExp(r'\s+'));
-      for (final token in tokens) {
-        if (token.length < 3) continue;
-        if (name.contains(token) || token.contains(name)) return true;
-      }
-    }
-    // Arabic name match.
-    if (nameAr.isNotEmpty && senderLower.contains(nameAr)) return true;
-    // Code contained in sender (e.g., sender "FAISALBANK" contains "faisal").
-    if (code.isNotEmpty && code.length >= 3 && senderLower.contains(code)) {
-      return true;
-    }
-    return false;
+    final canonical = BankCatalog.match(senderLower, '');
+    final known =
+        BankCatalog.byIdentity(bank.code) ?? BankCatalog.byIdentity(bank.name);
+    if (canonical != null && known != null) return canonical.code == known.code;
+    final key = BankCatalog.normalize(senderLower);
+    return [bank.code, bank.name, bank.nameAr]
+        .whereType<String>()
+        .where((s) => s.trim().isNotEmpty)
+        .any((s) => BankCatalog.normalize(s) == key);
   }
-
-  // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Parse a bank SMS into a structured transaction.
   ///
@@ -378,10 +216,15 @@ class SMSParser {
     final normalizedBody = _normalizeDigits(smsContent);
     final fingerprint = fingerprintOf(normalizedBody);
 
-    final amount = extractAmount(normalizedBody);
+    final amount = isPromotional(normalizedBody)
+        ? null
+        : extractAmount(normalizedBody);
     final currency = detectCurrency(normalizedBody);
     final bank = detectBank(
-        sender: sender, body: normalizedBody, knownBanks: knownBanks);
+      sender: sender,
+      body: normalizedBody,
+      knownBanks: knownBanks,
+    );
     final classification = classify(normalizedBody);
 
     final type = classification.type;
@@ -426,11 +269,13 @@ class SMSParser {
     final normalized = _normalizeDigits(smsContent)
         .toLowerCase()
         .replaceAll(
-            RegExp(
-                r'(?:available balance|balance|الرصيد المتاح|الرصيد)'
-                r'\s*:?\s*(?:egp|ج\.م|le)?\s*[\d.,]+\s*(?:egp|ج\.م|le)?',
-                caseSensitive: false),
-            '')
+          RegExp(
+            r'(?:available balance|balance|الرصيد المتاح|الرصيد)'
+            r'\s*:?\s*(?:egp|ج\.م|le)?\s*[\d.,]+\s*(?:egp|ج\.م|le)?',
+            caseSensitive: false,
+          ),
+          '',
+        )
         .replaceAll(RegExp(r'\s+'), ' ')
         .replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]'), '')
         .trim();
@@ -447,42 +292,30 @@ class SMSParser {
     required String body,
     List<Bank> knownBanks = const [],
   }) {
-    final text = '${sender ?? ''} $body'.toLowerCase();
-
-    Bank? best;
-    var bestScore = 0;
-    for (final bank in knownBanks) {
-      var score = 0;
-      final code = (bank.code ?? '').toLowerCase();
-      final name = bank.name.toLowerCase();
-      final nameAr = (bank.nameAr ?? '').toLowerCase();
-      if (code.isNotEmpty && text.contains(code)) score += 3;
-      if (name.isNotEmpty && text.contains(name)) score += 2;
-      if (nameAr.isNotEmpty && text.contains(nameAr)) score += 2;
-      if (sender != null) {
-        final senderClean =
-            sender.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-        if (code.isNotEmpty && senderClean.contains(code)) score += 4;
-        if (code.isNotEmpty && code.contains(senderClean)) score += 4;
+    final staticMatch = BankCatalog.match(sender, body);
+    if (staticMatch != null) {
+      for (final bank in knownBanks) {
+        final identity =
+            BankCatalog.byIdentity(bank.code) ??
+            BankCatalog.byIdentity(bank.name);
+        if (identity?.code == staticMatch.code) {
+          return bank;
+        }
       }
-      if (score > bestScore) {
-        bestScore = score;
-        best = bank;
+      return Bank(
+        id: '',
+        name: staticMatch.name,
+        nameAr: staticMatch.nameAr,
+        code: staticMatch.code,
+      );
+    }
+    for (final bank in knownBanks) {
+      if ((sender != null && _senderMatchesBank(sender.toLowerCase(), bank)) ||
+          _bodyCarriesBankName(body, bank)) {
+        return bank;
       }
     }
-
-    if (bestScore >= 2) return best;
-
-    // Static catalog fallback (returns a Bank with an empty id; the caller
-    // resolves the real id or treats it as a manual-assignment case).
-    final staticMatch = BankCatalog.match(sender, body);
-    return staticMatch == null
-        ? null
-        : Bank(
-            id: '',
-            name: staticMatch.name,
-            nameAr: staticMatch.nameAr,
-            code: staticMatch.code);
+    return null;
   }
 
   /// Convenience method kept for compatibility.
@@ -509,29 +342,42 @@ class SMSParser {
       RegExp(r'([\d][\d.,]*)\s*جم(?![\w\u0600-\u06FF])', caseSensitive: false),
       RegExp(r'جم\s*([\d][\d.,]*)', caseSensitive: false),
       // "EGP 500.00" / "ج.م 500" / "LE 500" after currency symbol.
-      RegExp(r'(?:egp|ج\.م|جنيه|le|e\s?£)\s*([\d][\d.,]*)',
-          caseSensitive: false),
+      RegExp(
+        r'(?:egp|ج\.م|جنيه|le|e\s?£)\s*([\d][\d.,]*)',
+        caseSensitive: false,
+      ),
       // "500.00 EGP" / "500 ج.م" before currency symbol.
-      RegExp(r'([\d][\d.,]*)\s*(?:egp|ج\.م|جنيه|le|e\s?£)',
-          caseSensitive: false),
+      RegExp(
+        r'([\d][\d.,]*)\s*(?:egp|ج\.م|جنيه|le|e\s?£)',
+        caseSensitive: false,
+      ),
       // "amount: 500" / "المبلغ 500" / "بمبلغ 500" (attached or spaced).
-      RegExp(r'(?:amount|المبلغ|بمبلغ|total|الإجمالي)\s*:?\s*([\d][\d.,]*)',
-          caseSensitive: false),
+      RegExp(
+        r'(?:amount|المبلغ|بمبلغ|total|الإجمالي)\s*:?\s*([\d][\d.,]*)',
+        caseSensitive: false,
+      ),
       // Foreign-currency amounts: "$25.50" / "USD 100" / "25.50 EUR".
       RegExp(r'\$\s*([\d][\d.,]*)', caseSensitive: false),
       RegExp(r'€\s*([\d][\d.,]*)', caseSensitive: false),
       RegExp(r'£\s*([\d][\d.,]*)', caseSensitive: false),
-      RegExp(r'(?:usd|eur|gbp|sar|aed|kwd|jod)\s*([\d][\d.,]*)',
-          caseSensitive: false),
-      RegExp(r'([\d][\d.,]*)\s*(?:usd|eur|gbp|sar|aed|kwd|jod)',
-          caseSensitive: false),
+      RegExp(
+        r'(?:usd|eur|gbp|sar|aed|kwd|jod)\s*([\d][\d.,]*)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'([\d][\d.,]*)\s*(?:usd|eur|gbp|sar|aed|kwd|jod)',
+        caseSensitive: false,
+      ),
     ];
 
     for (final pattern in patterns) {
       for (final match in pattern.allMatches(s)) {
         final value = _parseNumber(match.group(1));
         if (value != null) {
-          final cleaned = match.group(1)!.replaceAll(',', '');
+          final cleaned = match
+              .group(1)!
+              .replaceAll(',', '')
+              .replaceFirst(RegExp(r'[.,]+$'), '');
           final parts = cleaned.split('.');
           final majorDigits = _stripLeadingZeros(parts[0]);
           final hasDecimal = parts.length == 2 && parts[1].isNotEmpty;
@@ -573,9 +419,9 @@ class SMSParser {
   static int? extractWholeAmount(String sms) {
     final s = _transactionText(sms);
     final match = RegExp(
-            r'(?:amount|بمبلغ|مبلغ|بقيمة|خصم|إضافة|اضافة)\s*:?\s*(\d+(?:[.,]\d+)*)',
-            caseSensitive: false)
-        .firstMatch(s);
+      r'(?:amount|بمبلغ|مبلغ|بقيمة|خصم|إضافة|اضافة)\s*:?\s*(\d+(?:[.,]\d+)*)',
+      caseSensitive: false,
+    ).firstMatch(s);
     if (match == null) return null;
     final value = _parseNumber(match.group(1));
     if (value == null || value <= 0) return null;
@@ -618,14 +464,48 @@ class SMSParser {
 
   // ── Classification ─────────────────────────────────────────────────────────
 
+  /// Marketing discounts are not debits. A completed transaction may include
+  /// an offer footer, so completed financial wording takes precedence.
+  static bool isPromotional(String sms) {
+    final s = _normalizeDigits(
+      sms,
+    ).toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final completed = RegExp(
+      r'تمت?\s+(?:عملية|شراء|خصم|سحب|إضافة|اضافة|إضافه|اضافه|استلام|إيداع|ايداع|دفع|تحويل)'
+      r'|purchase\s+of|transfer\s+(?:received|sent)|(?:debited|credited)\s+(?:from|to)'
+      r'|(?:has been|was|successfully)\s+(?:debited|credited|paid|transferred)'
+      r'|(?:cash|atm)\s+(?:withdrawal|deposit)\s+(?:of\s+)?(?:egp|usd|\d)'
+      r'|you\s+(?:paid|spent|received)|salary\s+credited|refund\s+of',
+      caseSensitive: false,
+    ).hasMatch(s);
+    final creditedUnits = RegExp(
+      r'تم\s*[إا]ضاف[ةه]\s*\d+\s*(?:وحد[ةه]|دقيق[ةه]|ميجابايت)',
+    ).hasMatch(s);
+    if (completed && !creditedUnits) return false;
+    return RegExp(
+      r'خصم\s*(?:يصل\s*(?:إلى|الى)?\s*|حتى\s*)?\d+(?:[.,]\d+)?\s*[%٪]'
+      r'|\d+(?:[.,]\d+)?\s*[%٪]\s*(?:off|discount|cashback|cash back)'
+      r'|(?:خصم|discount|cashback|cash back).{0,35}\d+(?:[.,]\d+)?\s*[%٪]'
+      r'|برومو\s*كود|كود\s*(?:الخصم|خصم)|promo\s*code|coupon'
+      r'|خصم.{0,55}(?:بحد\s*أقصى|بحد\s*اقصى|عند\s*الدفع|على\s*مشتريات)'
+      r'|(?:احصل|استمتع|إستمتع|اغتنم|إغتنم).{0,65}(?:عرض|خصم|هدية|هديه)'
+      r'|(?:وحد[ةه]|دقائق|ميجابايت|ميجابيتس).{0,60}(?:هدية|هديه)'
+      r'|(?:هدية|هديه).{0,60}(?:وحد[ةه]|دقائق|ميجابايت|ميجابيتس)'
+      r'|(?:تطبق|تُطبق)\s*الشروط\s*والأحكام|terms\s*(?:and|&)\s*conditions\s*apply',
+      caseSensitive: false,
+    ).hasMatch(s);
+  }
+
   static ClassificationResult classify(String sms) {
     final s = _normalizeDigits(sms).toLowerCase();
 
+    if (isPromotional(s)) return const ClassificationResult(null, 0);
+
     // Notifications about failed attempts and OTPs never move money.
     if (RegExp(
-            r'\botp\b|one[ -]time|verification code|رمز التحقق|كود التحقق|لم تتم|غير ناجح|مرفوض|\bdeclined\b|\bfailed\b|\bunsuccessful\b',
-            caseSensitive: false)
-        .hasMatch(s)) {
+      r'\botp\b|one[ -]time|verification code|رمز التحقق|كود التحقق|لم تتم|غير ناجح|مرفوض|\bdeclined\b|\bfailed\b|\bunsuccessful\b',
+      caseSensitive: false,
+    ).hasMatch(s)) {
       return const ClassificationResult(null, 0);
     }
 
@@ -746,9 +626,10 @@ class SMSParser {
       return const ClassificationResult(TransactionType.purchase, -1);
     }
 
-    if (RegExp(r'تم\s*(?:إضافة|اضافة|إضافه|اضافه)|added to|credited to',
-            caseSensitive: false)
-        .hasMatch(s)) {
+    if (RegExp(
+      r'تم\s*(?:إضافة|اضافة|إضافه|اضافه)|added to|credited to',
+      caseSensitive: false,
+    ).hasMatch(s)) {
       return const ClassificationResult(TransactionType.income, 1);
     }
     if (s.contains('خصم')) {
@@ -851,7 +732,8 @@ class SMSParser {
   /// plain "خصم" anywhere never retriggers.
   static bool _isMobileBankingDeduction(String s) {
     final hasDeduction = s.contains('خصم');
-    final hasChannel = s.contains('الموبايل') ||
+    final hasChannel =
+        s.contains('الموبايل') ||
         s.contains('الانترنت البنكي') ||
         s.contains('المحمول والانترنت');
     return hasDeduction && hasChannel;
@@ -863,8 +745,9 @@ class SMSParser {
   /// `الى` vs `إلى` handled by [_normalizeHamza]. Whitespace between words is
   /// collapsed so "رقم 6101" / "رقم6101" / "بمبلغ 240" / "بمبلغ240" all match.
   static bool _isIpnReceivedTransfer(String s) {
-    final t =
-        RegExp(r'\s+').hasMatch(s) ? s.replaceAll(RegExp(r'\s+'), ' ') : s;
+    final t = RegExp(r'\s+').hasMatch(s)
+        ? s.replaceAll(RegExp(r'\s+'), ' ')
+        : s;
     return RegExp(
       r'تم\s+إضافة\s+تحويل\s+ipn'
       r'\s*(?:إلى|الي)?\s*حسابكم\s*رقم[^\d]{0,3}\d{1,16}',
@@ -877,9 +760,10 @@ class SMSParser {
   /// "تحويل"/"حوالة" tokens when no explicit channel name is present.
   static String? _extractTransferMethod(String s) {
     final t = _normalizeHamza(s);
-    final direct = RegExp(r'تحويل\s+(ipn|انستا باي|انستاباي|لحظي|فوري)',
-            caseSensitive: false)
-        .firstMatch(t);
+    final direct = RegExp(
+      r'تحويل\s+(ipn|انستا باي|انستاباي|لحظي|فوري)',
+      caseSensitive: false,
+    ).firstMatch(t);
     if (direct != null) return direct.group(1);
     for (final method in ['IPN', 'تحويل', 'حوالة']) {
       if (t.contains(method)) return method;
@@ -906,9 +790,9 @@ class SMSParser {
   static String? _extractAccountLast4(String s) {
     final t = _normalizeHamza(s);
     final m = RegExp(
-            r'(?:حسابك(?:م)?\s*(?:رقم)?|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*(\d{4,16})(?!\d)',
-            caseSensitive: false)
-        .firstMatch(t);
+      r'(?:حسابك(?:م)?\s*(?:رقم)?|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*(\d{4,16})(?!\d)',
+      caseSensitive: false,
+    ).firstMatch(t);
     if (m == null) return null;
     final digits = m.group(1)!.replaceAll(RegExp(r'\D'), '');
     if (digits.isEmpty) return null;
@@ -1079,8 +963,9 @@ class SMSParser {
   static String _transactionText(String sms) => _normalizeDigits(sms)
       .split(
         RegExp(
-            r'رصيدك|الرصيد|المتاح\s*(?:الان|الآن)|available\s*(?:balance|credit)|\bbalance\b',
-            caseSensitive: false),
+          r'رصيدك|الرصيد|المتاح\s*(?:الان|الآن)|available\s*(?:balance|credit)|\bbalance\b',
+          caseSensitive: false,
+        ),
       )
       .first;
 
@@ -1089,18 +974,18 @@ class SMSParser {
   static String? accountToken(String sms) {
     final s = _normalizeDigits(sms).replaceAll(RegExp(r'\s+'), ' ');
     final match = RegExp(
-            r'(?:حسابك(?:م)?\s*(?:رقم)?|(?:من|إلى|الى)\s+ح\s*|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*([\d*Xx]{4,24})(?!\d)',
-            caseSensitive: false)
-        .firstMatch(s);
+      r'(?:حسابك(?:م)?\s*(?:رقم)?|(?:من|إلى|الى)\s+ح\s*|account\s*(?:number|no\.?|ending(?: in)?)?)\s*[:#]?\s*([\d*Xx]{4,24})(?!\d)',
+      caseSensitive: false,
+    ).firstMatch(s);
     return match?.group(1)?.toUpperCase();
   }
 
   static DateTime? extractTransactionDate(String sms) {
     final s = _normalizeDigits(sms);
     final match = RegExp(
-            r'(\d{1,2})[/\.](\d{1,2})[/\.](\d{2,4})\s*(?:-|في|فى|الساعة)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?',
-            caseSensitive: false)
-        .firstMatch(s);
+      r'(\d{1,2})[/\.](\d{1,2})[/\.](\d{2,4})\s*(?:-|في|فى|الساعة)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?',
+      caseSensitive: false,
+    ).firstMatch(s);
     if (match == null) return null;
     var day = int.parse(match[1]!);
     var month = int.parse(match[2]!);
@@ -1131,15 +1016,22 @@ class SMSParser {
   /// attached forms like "بمبلغ10.00" tokenize as "بمبلغ 10.00".
   static String _insertDigitBoundaries(String input) {
     var out = input.replaceAllMapped(
-        RegExp(r'([\u0600-\u06FF])(?=\d)'), (m) => '${m.group(1)} ');
+      RegExp(r'([\u0600-\u06FF])(?=\d)'),
+      (m) => '${m.group(1)} ',
+    );
     out = out.replaceAllMapped(
-        RegExp(r'(\d)(?=[\u0600-\u06FF])'), (m) => '${m.group(1)} ');
+      RegExp(r'(\d)(?=[\u0600-\u06FF])'),
+      (m) => '${m.group(1)} ',
+    );
     return out;
   }
 
   static double? _parseNumber(String? raw) {
     if (raw == null) return null;
-    final trimmed = raw.replaceAll(' ', '').replaceAll(',', '');
+    final trimmed = raw
+        .replaceAll(' ', '')
+        .replaceAll(',', '')
+        .replaceFirst(RegExp(r'[.,]+$'), '');
     return double.tryParse(trimmed);
   }
 
@@ -1201,18 +1093,25 @@ class SMSParser {
     // label and the four digits cannot be an account/reference/OTP label.
     final labeledPatterns = [
       RegExp(
-          r'card\s*(?:(?:ending(?:\s+in)?|number|no\.?|#)\s*)?'
-          r'[:\-]?\s*(\d{4})(?!\d)',
-          caseSensitive: false),
-      RegExp(r'card\s+(?:reference|ref\.?)\s*[:\-]?\s*(\d{4})(?!\d)',
-          caseSensitive: false),
-      RegExp(r'(?:رقم\s+)?(?:بطاقة|بطاقه)\s*'
-          r'(?:(?:رقم(?!\s*مرجعي)|تنتهي\s*(?:بـ|ب|في)?)\s*)?'
-          r'[:\-]?\s*(\d{4})(?!\d)'),
-      RegExp(r'(?:رقم\s+)?(?:بطاقة|بطاقه)'
-          r'(?![^\d\n]{0,24}(?:رقم\s*مرجعي|رقم\s*المرجع|مرجع|حساب|'
-          r'رقم\s*(?:العملية|عملية)|otp|كود))'
-          r'[^\d\n]{0,24}?(\d{4})(?!\d)'),
+        r'card\s*(?:(?:ending(?:\s+in)?|number|no\.?|#)\s*)?'
+        r'[:\-]?\s*(\d{4})(?!\d)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'card\s+(?:reference|ref\.?)\s*[:\-]?\s*(\d{4})(?!\d)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'(?:رقم\s+)?(?:بطاقة|بطاقه)\s*'
+        r'(?:(?:رقم(?!\s*مرجعي)|تنتهي\s*(?:بـ|ب|في)?)\s*)?'
+        r'[:\-]?\s*(\d{4})(?!\d)',
+      ),
+      RegExp(
+        r'(?:رقم\s+)?(?:بطاقة|بطاقه)'
+        r'(?![^\d\n]{0,24}(?:رقم\s*مرجعي|رقم\s*المرجع|مرجع|حساب|'
+        r'رقم\s*(?:العملية|عملية)|otp|كود))'
+        r'[^\d\n]{0,24}?(\d{4})(?!\d)',
+      ),
     ];
     for (final pattern in labeledPatterns) {
       final match = pattern.firstMatch(s);
@@ -1230,13 +1129,15 @@ class SMSParser {
   static String? _extractMerchant(String s) {
     final patterns = [
       RegExp(
-          r"(?:debit\s+at|paid at|at|from|merchant)\s+"
-          r"([a-z0-9&.\- ]{2,40})",
-          caseSensitive: false),
+        r"(?:debit\s+at|paid at|at|from|merchant)\s+"
+        r"([a-z0-9&.\- ]{2,40})",
+        caseSensitive: false,
+      ),
       RegExp(
-          r"purchase\s+of\s+[\d.,]+\s*(?:egp|ج\.م)?\s+(?:at|from)\s+"
-          r"([a-z0-9&.\- ]{2,40})",
-          caseSensitive: false),
+        r"purchase\s+of\s+[\d.,]+\s*(?:egp|ج\.م)?\s+(?:at|from)\s+"
+        r"([a-z0-9&.\- ]{2,40})",
+        caseSensitive: false,
+      ),
       RegExp(r'(?:عند|من|في|متجر|محل)\s+([^\d]{2,40})'),
       RegExp(r"goods\s*:\s*([a-z0-9&.\- ]{2,40})", caseSensitive: false),
     ];
@@ -1248,14 +1149,15 @@ class SMSParser {
           // Skip account/reference labels that should not be merchants.
           final lowerMerchant = merchant.toLowerCase();
           if (RegExp(
-                  r'(?:حساب|account|رقم|reference|ref|رقم\s+مرجعي|رقم\s+الحساب)'
-                  r'|^[a-z0-9]{1,3}$')
-              .hasMatch(lowerMerchant)) {
+            r'(?:حساب|account|رقم|reference|ref|رقم\s+مرجعي|رقم\s+الحساب)'
+            r'|^[a-z0-9]{1,3}$',
+          ).hasMatch(lowerMerchant)) {
             continue;
           }
           final cleaned = merchant
               .split(
-                  RegExp(r'\s+(?:on|with|using|egp|ج\.م|amount|\d|ref|مرجع)\b'))
+                RegExp(r'\s+(?:on|with|using|egp|ج\.م|amount|\d|ref|مرجع)\b'),
+              )
               .first
               .trim();
           if (cleaned.isNotEmpty && cleaned.length < 60) return cleaned;

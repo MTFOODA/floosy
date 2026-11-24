@@ -11,7 +11,7 @@ DateTime _dateTimeFromJsonRequired(dynamic value) =>
 
 /// A monthly income/salary entry for the user (e.g. "September Salary").
 @freezed
-class MonthlyIncome with _$MonthlyIncome {
+abstract class MonthlyIncome with _$MonthlyIncome {
   const factory MonthlyIncome({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -33,7 +33,7 @@ class MonthlyIncome with _$MonthlyIncome {
 
 /// A user-owned bank account (multi-bank support).
 @freezed
-class UserBankAccount with _$UserBankAccount {
+abstract class UserBankAccount with _$UserBankAccount {
   const factory UserBankAccount({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -56,7 +56,7 @@ class UserBankAccount with _$UserBankAccount {
 /// Ledger movement on a bank account. The balance is always derived from
 /// the ledger, never stored as a mutable sum.
 @freezed
-class BankAccountMovement with _$BankAccountMovement {
+abstract class BankAccountMovement with _$BankAccountMovement {
   const factory BankAccountMovement({
     required String id,
     @JsonKey(name: 'account_id') required String accountId,
@@ -117,11 +117,11 @@ class MoneySummary {
   /// Returns a MoneySummary with all values set to zero.
   /// Used when no card is selected on the dashboard.
   factory MoneySummary.zero() => const MoneySummary(
-        myBalanceMinor: 0,
-        deductedMinor: 0,
-        pocketCashMinor: 0,
-        monthlyIncomeMinor: 0,
-      );
+    myBalanceMinor: 0,
+    deductedMinor: 0,
+    pocketCashMinor: 0,
+    monthlyIncomeMinor: 0,
+  );
 
   MoneySummary copyWith({
     int? myBalanceMinor,

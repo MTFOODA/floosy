@@ -59,10 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await context.read<AuthCubit>().signIn(
-            email: email,
-            password: password,
-          );
+      await context.read<AuthCubit>().signIn(email: email, password: password);
       if (mounted) {
         context.go(AppRoutes.dashboard);
       }
@@ -83,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         } else {
           setState(() {
-            _errorMessage = '${l['loginFailed']}: ${e.toString()}';
+            _errorMessage = l['loginFailed'];
             _isEmailNotConfirmed = false;
           });
         }
@@ -108,8 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage =
-            '${l['resendConfirmationFailed']}: ${e.toString()}');
+        setState(() => _errorMessage = l['resendConfirmationFailed']);
       }
     }
   }
@@ -135,15 +131,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleBiometricLogin() async {
     setState(() => _errorMessage = null);
-    final ok = await context
-        .read<AppLockCubit>()
-        .unlockWithBiometrics(AppLocalizations.s(context)['biometricReason']);
+    final ok = await context.read<AppLockCubit>().unlockWithBiometrics(
+      AppLocalizations.s(context)['biometricReason'],
+    );
     if (!mounted) return;
     if (ok) {
       context.go(AppRoutes.dashboard);
     } else {
-      setState(() =>
-          _errorMessage = AppLocalizations.s(context)['biometricLoginFailed']);
+      setState(
+        () =>
+            _errorMessage = AppLocalizations.s(context)['biometricLoginFailed'],
+      );
     }
   }
 
@@ -152,8 +150,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final l = AppLocalizations.s(context);
     context.watch<AuthCubit>();
 
-    final biometricAvailable =
-        context.watch<AppLockCubit>().state.biometricAvailable;
+    final biometricAvailable = context
+        .watch<AppLockCubit>()
+        .state
+        .biometricAvailable;
     final biometricBusy = context.watch<AppLockCubit>().state.authenticating;
     final busy = _isLoading || _isGooglePending || biometricBusy;
     final alternativeButtonStyle = OutlinedButton.styleFrom(
@@ -164,236 +164,268 @@ class _LoginScreenState extends State<LoginScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     );
     return BlocListener<AuthCubit, AuthenticationState>(
-        listenWhen: (previous, next) =>
-            previous.googlePending &&
-            (next.error != null || next.event == AccountEvent.signedIn),
-        listener: (context, next) {
-          if (next.error != null) {
-            final error = next.error;
-            final profileFailure = error is AuthenticationFailure &&
-                error.message
-                    .toLowerCase()
-                    .contains('database error saving new user');
-            setState(() {
-              _errorMessage = l[profileFailure
-                  ? 'googleAccountSetupFailed'
-                  : 'googleSignInFailed'];
-            });
-          }
-        },
-        child: Scaffold(
-          backgroundColor: context.fc.authBackground,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: FloosyDesign.horizontalPadding(context)
-                  .copyWith(top: 12, bottom: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Tooltip(
-                      message: l['selectLanguage'],
-                      child: SegmentedButton<String>(
-                        showSelectedIcon: false,
-                        segments: l.isArabic
-                            ? const [
-                                ButtonSegment(
-                                    value: 'ar', label: Text('العربية')),
-                                ButtonSegment(
-                                    value: 'en', label: Text('English')),
-                              ]
-                            : const [
-                                ButtonSegment(
-                                    value: 'en', label: Text('English')),
-                                ButtonSegment(
-                                    value: 'ar', label: Text('العربية')),
-                              ],
-                        selected: {l.locale.languageCode},
-                        style: SegmentedButton.styleFrom(
-                          textStyle: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 5),
-                          minimumSize: const Size(0, 32),
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.padded,
-                          backgroundColor: context.fc.toggleBackground,
-                          foregroundColor: context.fc.textSecondary,
-                          selectedBackgroundColor: FloosyDesign.primaryPurple,
-                          selectedForegroundColor: Colors.white,
-                          side: BorderSide(color: context.fc.borderSubtle),
-                        ),
-                        onSelectionChanged: (selection) {
-                          setState(() {
-                            _errorMessage = null;
-                            _isEmailNotConfirmed = false;
-                          });
-                          context
-                              .read<LocaleCubit>()
-                              .setLocale(Locale(selection.single));
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const AuthBrandHeader(),
-                  const SizedBox(height: 20),
-                  const AuthModeSwitch(),
-                  const SizedBox(height: 20),
-                  if (_errorMessage != null)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: context.fc.logoutBg,
-                        borderRadius:
-                            BorderRadius.circular(FloosyDesign.radiusSmall),
-                        border: Border.all(color: context.fc.logoutBorder),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(_errorMessage!,
-                              style: const TextStyle(
-                                  color: FloosyDesign.negative, fontSize: 13)),
-                          if (_isEmailNotConfirmed)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: TextButton.icon(
-                                onPressed:
-                                    _isResending ? null : _resendConfirmation,
-                                icon: _isResending
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2))
-                                    : const Icon(Icons.email_outlined,
-                                        size: 18,
-                                        color: FloosyDesign.brightPurple),
-                                label: Text(l['resendConfirmationEmail'],
-                                    style: const TextStyle(
-                                        color: FloosyDesign.brightPurple)),
+      listenWhen: (previous, next) =>
+          previous.googlePending &&
+          (next.error != null || next.event == AccountEvent.signedIn),
+      listener: (context, next) {
+        if (next.error != null) {
+          final error = next.error;
+          final profileFailure =
+              error is AuthenticationFailure &&
+              error.message.toLowerCase().contains(
+                'database error saving new user',
+              );
+          setState(() {
+            _errorMessage =
+                l[profileFailure
+                    ? 'googleAccountSetupFailed'
+                    : 'googleSignInFailed'];
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: context.fc.authBackground,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: FloosyDesign.horizontalPadding(
+              context,
+            ).copyWith(top: 12, bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Tooltip(
+                    message: l['selectLanguage'],
+                    child: SegmentedButton<String>(
+                      showSelectedIcon: false,
+                      segments: l.isArabic
+                          ? [
+                              const ButtonSegment(
+                                value: 'ar',
+                                label: Text('العربية'),
                               ),
-                            ),
-                        ],
+                              ButtonSegment(
+                                value: 'en',
+                                label: Text(l['englishLanguage']),
+                              ),
+                            ]
+                          : [
+                              ButtonSegment(
+                                value: 'en',
+                                label: Text(l['englishLanguage']),
+                              ),
+                              const ButtonSegment(
+                                value: 'ar',
+                                label: Text('العربية'),
+                              ),
+                            ],
+                      selected: {l.locale.languageCode},
+                      style: SegmentedButton.styleFrom(
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        minimumSize: const Size(0, 32),
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.padded,
+                        backgroundColor: context.fc.toggleBackground,
+                        foregroundColor: context.fc.textSecondary,
+                        selectedBackgroundColor: FloosyDesign.primaryPurple,
+                        selectedForegroundColor: Colors.white,
+                        side: BorderSide(color: context.fc.borderSubtle),
                       ),
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _errorMessage = null;
+                          _isEmailNotConfirmed = false;
+                        });
+                        context.read<LocaleCubit>().setLocale(
+                          Locale(selection.single),
+                        );
+                      },
                     ),
-                  AuthTextField(
-                    controller: _emailController,
-                    hintText: 'ahmed@example.com',
-                    prefixIcon: Icons.alternate_email,
-                    keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 12),
-                  AuthTextField(
-                    controller: _passwordController,
-                    hintText: l['enterPassword'],
-                    prefixIcon: Icons.lock_outline_rounded,
-                    obscureText: _obscurePassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
-                        color: context.fc.textMuted,
-                        size: 20,
+                ),
+                const SizedBox(height: 12),
+                const AuthBrandHeader(),
+                const SizedBox(height: 20),
+                const AuthModeSwitch(),
+                const SizedBox(height: 20),
+                if (_errorMessage != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: context.fc.logoutBg,
+                      borderRadius: BorderRadius.circular(
+                        FloosyDesign.radiusSmall,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      border: Border.all(color: context.fc.logoutBorder),
                     ),
-                  ),
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: TextButton(
-                      onPressed: () => context.go(AppRoutes.forgotPassword),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 40),
-                        foregroundColor: FloosyDesign.brightPurple,
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                      child: Text(l['forgotPassword']),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  GradientButton(
-                    text: l['login'],
-                    onPressed: busy ? null : _handleLogin,
-                    isLoading: _isLoading,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: alternativeButtonStyle,
-                        onPressed: busy ? null : _handleGoogleLogin,
-                        icon: _isGooglePending
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.account_circle_outlined,
-                                size: 20),
-                        label: Text(l[_isGooglePending
-                            ? 'googleSignInPending'
-                            : 'continueWithGoogle']),
-                      )),
-                  if (_isGooglePending)
-                    TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => context.read<AuthCubit>().cancelGoogle(),
-                      child: Text(l['cancel']),
-                    ),
-                  if (biometricAvailable) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: alternativeButtonStyle,
-                        onPressed: busy ? null : _handleBiometricLogin,
-                        icon: biometricBusy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.fingerprint_rounded, size: 20),
-                        label: Text(l['loginWithBiometrics']),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 4,
+                    child: Column(
                       children: [
-                        Text(l['dontHaveAccount'],
-                            style: context.fc.bodyText.copyWith(fontSize: 12)),
-                        GestureDetector(
-                          onTap: () => context.go(AppRoutes.register),
-                          child: Text(
-                            l['signup'],
-                            style: context.fc.bodyText.copyWith(
-                              fontSize: 12,
-                              color: FloosyDesign.brightPurple,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: FloosyDesign.negative,
+                            fontSize: 13,
                           ),
                         ),
+                        if (_isEmailNotConfirmed)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: TextButton.icon(
+                              onPressed: _isResending
+                                  ? null
+                                  : _resendConfirmation,
+                              icon: _isResending
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.email_outlined,
+                                      size: 18,
+                                      color: FloosyDesign.brightPurple,
+                                    ),
+                              label: Text(
+                                l['resendConfirmationEmail'],
+                                style: const TextStyle(
+                                  color: FloosyDesign.brightPurple,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
+                AuthTextField(
+                  controller: _emailController,
+                  hintText: l['emailHint'],
+                  prefixIcon: Icons.alternate_email,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                AuthTextField(
+                  controller: _passwordController,
+                  hintText: l['enterPassword'],
+                  prefixIcon: Icons.lock_outline_rounded,
+                  obscureText: _obscurePassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
+                      color: context.fc.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: () => context.go(AppRoutes.forgotPassword),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 40),
+                      foregroundColor: FloosyDesign.brightPurple,
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    child: Text(l['forgotPassword']),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                GradientButton(
+                  text: l['login'],
+                  onPressed: busy ? null : _handleLogin,
+                  isLoading: _isLoading,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: alternativeButtonStyle,
+                    onPressed: busy ? null : _handleGoogleLogin,
+                    icon: _isGooglePending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.account_circle_outlined, size: 20),
+                    label: Text(
+                      l[_isGooglePending
+                          ? 'googleSignInPending'
+                          : 'continueWithGoogle'],
+                    ),
+                  ),
+                ),
+                if (_isGooglePending)
+                  TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () => context.read<AuthCubit>().cancelGoogle(),
+                    child: Text(l['cancel']),
+                  ),
+                if (biometricAvailable) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: alternativeButtonStyle,
+                      onPressed: busy ? null : _handleBiometricLogin,
+                      icon: biometricBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.fingerprint_rounded, size: 20),
+                      label: Text(l['loginWithBiometrics']),
+                    ),
+                  ),
                 ],
-              ),
+                const SizedBox(height: 16),
+                Center(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    children: [
+                      Text(
+                        l['dontHaveAccount'],
+                        style: context.fc.bodyText.copyWith(fontSize: 12),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.go(AppRoutes.register),
+                        child: Text(
+                          l['signup'],
+                          style: context.fc.bodyText.copyWith(
+                            fontSize: 12,
+                            color: FloosyDesign.brightPurple,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

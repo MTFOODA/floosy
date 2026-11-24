@@ -1,0 +1,118 @@
+{
+  "validated_on": "2026-11-23",
+  "version": "1.0.4+10",
+  "flutter_analysis": "no_issues",
+  "flutter_tests": {
+    "passed": 65,
+    "failed": 0,
+    "full_suite_log": ".diag/104_release_tests.txt"
+  },
+  "android": {
+    "release_build": "passed",
+    "abi": "arm64-v8a",
+    "artifact": "output/release-2026-11-23/floosy-1.0.4-10-completion-arabic-arm64.apk",
+    "bytes": 28571485,
+    "sha256": "12804088c3a9ff05288fb58a2f4394317c596c9a4fda6624e522352b29377dde",
+    "cipher_library": "libsqlite3mc.so",
+    "signing": "existing_debug_key_for_review",
+    "device_run": "not_available_no_connected_device",
+    "installed_version_verified": null,
+    "signing_certificate_matches_previous": true,
+    "compiled_adaptive_icon_inset_verified": true
+  },
+  "startup": {
+    "cloud_import_requests": 0,
+    "preparation_deadline_seconds": 20,
+    "vault_generation": 2,
+    "auth_preserved": true,
+    "reset_once": true,
+    "sms_history": "first_day_of_current_device_month_then_incremental",
+    "sms_cursor_upgrade": "once_per_account_preserves_financial_rows_and_dedupe",
+    "existing_month_history_visible_on_phone": true,
+    "promotion_repair": "once_per_account_reverses_only_proven_promotional_sms",
+    "promotion_repair_phone_verification": "pending_manual_page_selection"
+  },
+  "production": {
+    "test_reset_authorized": true,
+    "removed_test_rows": 248,
+    "remaining_financial_rows": 0,
+    "auth_users_retained": 5,
+    "profiles_retained": 5,
+    "test_images_removed": 2,
+    "item_bucket_private_and_empty": true,
+    "account_credentials_changed": false,
+    "reset_repeated_for_this_release": false,
+    "last_audit_date": "2026-11-21"
+  },
+  "ios": "requires_macOS_Xcode_device_validation",
+  "windows": "build_requires_OS_symlink_support",
+  "encrypted_backup_restore": {
+    "status": "implemented",
+    "cipher": "AES-256-GCM",
+    "kdf": "PBKDF2-HMAC-SHA256",
+    "iterations": 600000,
+    "minimum_password_characters": 10,
+    "scope": "signed_in_account_only",
+    "auth_and_device_keys_exported": false,
+    "server_upload": false,
+    "compression": "gzip",
+    "ciphertext_limit_mib": 64,
+    "plaintext_limit_mib": 128,
+    "wrong_password_and_tamper": "passed",
+    "portable_restore_and_balances": "passed",
+    "repeated_restore_without_duplicates": "passed",
+    "rollback": "passed",
+    "other_account_rows_retained": "passed",
+    "sms_write_suspension_and_resume": "passed",
+    "native_settings_actions": "observed",
+    "native_file_save_restore": "requires_manual_validation_device_denies_injected_input"
+  },
+  "branding": {
+    "symbol": "original_navy_holder_with_three_realistic_landscape_cards",
+    "source": "assets/logo/floosy_symbol.png",
+    "source_sha256": "bff6893d24e802aaadcfd12f1db1301717beba371618aad6c63b1abcf58d6c34",
+    "native_android_day_night_and_api31": "updated",
+    "ios_launch_images": "updated_source_assets_requires_Xcode_validation",
+    "launcher_icons": "generated_android_ios_windows",
+    "generation": "output/branding-2026-11-21/original-wallet-real-cards/generation.txt",
+    "compiled_native_png_verified": true,
+    "compiled_png_alpha_identical": true,
+    "compiled_png_max_rgb_optimization_delta": 3,
+    "adaptive_icon_inset_percent": 18,
+    "symbol_linear_scale_vs_103": 0.7619,
+    "source_unchanged_from_103": true
+  },
+  "previous_device_validation": {
+    "version": "1.0.3+9",
+    "date": "2026-11-21",
+    "settings_and_login_observed": true,
+    "file_picker_save_restore": "requires_manual_validation"
+  },
+  "transaction_completion": {
+    "recorded_facts_locked": true,
+    "stale_forms_rejected": true,
+    "missing_fields_complete_once": true,
+    "notes_append": true,
+    "zero_holds_locked": true,
+    "optional_information_preserves_card_and_balance": "passed",
+    "database_changes_atomic": true,
+    "merchant_label_on_purchases": true,
+    "movement_icon_badge": true,
+    "row_gap_dp": 12,
+    "editor_gap_dp": 16
+  },
+  "localization": {
+    "locales": [
+      "ar",
+      "en"
+    ],
+    "matching_translation_keys": 639,
+    "matching_placeholders": "passed",
+    "arabic_values_without_english_labels": "passed",
+    "hints_and_action_sheets_localized": true,
+    "message_and_user_data_preserved": true,
+    "narrow_ui_and_large_text": "passed",
+    "synthetic_visual_review": "passed_with_actual_theme_and_loaded_arabic_font",
+    "translation_key_count": 639
+  }
+}

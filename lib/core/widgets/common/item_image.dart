@@ -1,6 +1,7 @@
 import '../../../features/items/presentation/cubit/item_image_cubit.dart';
 import '../../../domain/repositories/financial_queries_repository.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/core/state/load_state.dart';
 import '../../utils/app_logger.dart';
@@ -46,8 +47,9 @@ class FloosyItemImage extends StatelessWidget {
 
     return BlocProvider(
       key: ValueKey(raw),
-      create: (_) => ItemImageCubit(context.read<FinancialQueriesRepository>())
-        ..resolve(raw),
+      create: (_) =>
+          ItemImageCubit(context.read<FinancialQueriesRepository>())
+            ..resolve(raw),
       child: BlocBuilder<ItemImageCubit, LoadState<String?>>(
         builder: (context, urlAsync) {
           final content = urlAsync.when(
@@ -55,20 +57,20 @@ class FloosyItemImage extends StatelessWidget {
             error: (_, __) => fallback,
             data: (url) {
               if (url == null || url.isEmpty) {
-                logWarning('ITEM_IMAGE_LOAD_FAILED could not resolve "$raw" '
-                    '(missing object or bucket access denied)');
+                logWarning(
+                  'ITEM_IMAGE_LOAD_FAILED could not resolve "$raw" '
+                  '(missing object or bucket access denied)',
+                );
                 return fallback;
               }
-              return Image.network(
-                url,
-                fit: fit,
-                loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : _loading(context),
-                errorBuilder: (_, __, ___) {
-                  logWarning('ITEM_IMAGE_LOAD_FAILED network error for "$raw"');
-                  return fallback;
-                },
-              );
+              if (url.startsWith('data:image/')) {
+                return Image.memory(
+                  base64Decode(url.substring(url.indexOf(',') + 1)),
+                  fit: fit,
+                  errorBuilder: (_, __, ___) => fallback,
+                );
+              }
+              return fallback;
             },
           );
           return _frame(context, content);
@@ -87,7 +89,8 @@ class FloosyItemImage extends StatelessWidget {
   }
 
   Widget _loading(BuildContext context) {
-    final bg = loadingBackground ??
+    final bg =
+        loadingBackground ??
         Theme.of(context).colorScheme.surfaceContainerHighest;
     return ColoredBox(
       color: bg,

@@ -80,13 +80,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
         val messages = ArrayList<Map<String, Any?>>()
         try {
-            Log.d(
-                TAG,
-                "SMS_QUERY start (max=$maxCount"
-                    + (if (sinceMs != null) ", since=$sinceMs" else "")
-                    + (if (untilMs != null) ", until=$untilMs" else "")
-                    + ")"
-            )
             val projection = arrayOf(
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.BODY,
@@ -132,10 +125,9 @@ class MainActivity : FlutterFragmentActivity() {
                     )
                 }
             }
-            Log.d(TAG, "SMS_QUERY done count=${messages.size}")
             mainHandler.post { result.success(messages) }
         } catch (e: Exception) {
-            Log.e(TAG, "SMS_QUERY failed", e)
+            Log.e(TAG, "SMS_QUERY failed")
             mainHandler.post { result.error("QUERY_FAILED", e.message, null) }
         }
     }

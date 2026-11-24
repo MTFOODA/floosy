@@ -6,6 +6,8 @@ import '../repositories/transaction_repository.dart';
 import '../services/card_ownership.dart';
 import '../entities/card_resolution_result.dart';
 import '../repositories/money_repository.dart';
+import '../entities/transaction_edit_policy.dart';
+import '../entities/bank_directory.dart';
 
 /// The values the Edit dialog collects.
 class TransactionEditDraft {
@@ -18,6 +20,7 @@ class TransactionEditDraft {
   final String? categoryId;
   final String? merchantName;
   final DateTime transactionDate;
+  final String? additionalNote;
 
   const TransactionEditDraft({
     required this.transaction,
@@ -29,6 +32,7 @@ class TransactionEditDraft {
     required this.categoryId,
     required this.merchantName,
     required this.transactionDate,
+    this.additionalNote,
   });
 }
 
@@ -85,38 +89,119 @@ class SaveTransactionEdit {
   ///
   /// Returns the learning result (null when no Last 4 was supplied), so callers
   /// and tests can inspect exactly what was assigned.
-  Future<SmartResolutionResult?> save(TransactionEditDraft draft) async {
-    final transaction = draft.transaction;
+  Future<TransactionEditPolicy> policy(Transaction transaction) async {
+    final repository = transactionRepository;
+    var current = (await repository.getTransactions(
+      userId: userId,
+      syncWithRemote: false,
+    )).where((t) => t.id == transaction.id).firstOrNull;
+    if (current == null || current.userId != userId) {
+      throw const TransactionEditFailure('notFound');
+    }
+    var evidence = repository is TransactionEvidenceRepository
+        ? await (repository as TransactionEvidenceRepository).editEvidence(
+            userId,
+            current.id,
+          )
+        : null;
+    final currentCardId = current.cardId;
+    if (currentCardId?.isNotEmpty == true) {
+      final linked = (await cardRepository.getCards(
+        userId,
+      )).where((card) => card.id == currentCardId).firstOrNull;
+      if (linked != null) {
+        current = current.copyWith(
+          cardLast4: current.cardLast4 ?? linked.last4,
+        );
+        evidence = TransactionEditEvidence(
+          bankName: evidence?.bankName ?? linked.bankName,
+          typeIdentified: evidence?.typeIdentified ?? true,
+          amountIdentified:
+              evidence?.amountIdentified ?? current.amountMinor > 0,
+          currencyIdentified:
+              evidence?.currencyIdentified ?? current.currency.isNotEmpty,
+        );
+      }
+    }
+    return TransactionEditPolicy(current, evidence);
+  }
+
+  Future<SmartResolutionResult?> save(TransactionEditDraft draft) {
+    final repository = transactionRepository;
+    return repository is TransactionEvidenceRepository
+        ? (repository as TransactionEvidenceRepository).editAtomically(
+            () => _save(draft),
+          )
+        : _save(draft);
+  }
+
+  Future<SmartResolutionResult?> _save(TransactionEditDraft draft) async {
+    final rules = await policy(draft.transaction);
+    final transaction = rules.transaction;
+    if ((!rules.type && draft.type != transaction.type) ||
+        (!rules.amount && draft.amountMinor != transaction.amountMinor) ||
+        (!rules.currency && draft.currency != transaction.currency) ||
+        !draft.transactionDate.isAtSameMomentAs(transaction.transactionDate) ||
+        (!rules.last4 &&
+            normalizeCardLast4(draft.last4Text) != transaction.cardLast4) ||
+        (!rules.category && draft.categoryId != transaction.categoryId) ||
+        (!rules.merchant && draft.merchantName != transaction.merchantName)) {
+      throw const TransactionEditFailure('locked');
+    }
+    if (rules.amount && draft.amountMinor <= 0) {
+      throw const TransactionEditFailure('amount');
+    }
+    if (!RegExp(r'^[A-Z]{3}$').hasMatch(draft.currency)) {
+      throw const TransactionEditFailure('currency');
+    }
     final bankText = draft.bankText.trim();
+    if (!rules.bank && bankText.isNotEmpty) {
+      final existing = BankCatalog.byIdentity(rules.bankName);
+      final selected = BankCatalog.byIdentity(bankText);
+      if (bankText != transaction.bankId &&
+          bankText != rules.bankName &&
+          (existing == null || selected?.code != existing.code)) {
+        throw const TransactionEditFailure('locked');
+      }
+    }
 
     // Resolve the bank UUID the transactions table stores. This is display
     // information only and is NOT the card identity.
     String? bankId = transaction.bankId;
-    if (bankText.isNotEmpty) {
-      final known = await bankCatalogLoader();
+    if (rules.bank && bankText.isNotEmpty) {
+      List<Bank> known;
+      try {
+        known = await bankCatalogLoader().timeout(const Duration(seconds: 3));
+      } catch (_) {
+        known = const [];
+      }
+      final canonical = BankCatalog.byIdentity(bankText);
       final match = known
-          .where((b) =>
-              b.id == bankText || b.name == bankText || b.code == bankText)
+          .where(
+            (b) =>
+                b.id == bankText ||
+                b.name == bankText ||
+                b.code == bankText ||
+                (canonical != null &&
+                    (BankCatalog.byIdentity(b.code) ??
+                                BankCatalog.byIdentity(b.name))
+                            ?.code ==
+                        canonical.code),
+          )
           .toList();
       bankId = match.isEmpty ? null : match.first.id;
     }
 
-    // The bank used for CARD IDENTITY comes from the transaction's detection
-    // record, not from this field.
-    //
-    // The field is pre-filled with `transaction.merchantName`, which the SMS
-    // pipeline sets to `parsed.merchant ?? bankName` - so for a purchase SMS it
-    // usually holds a MERCHANT ("Koshary Abu Tarek"), not a bank. Passing that
-    // through as the bank identity would learn a bogus identity like
-    // "Koshary Abu Tarek + 1234" whose propagation would then match nothing.
-    //
-    // So the field is only treated as an explicit bank choice when the user
-    // actually CHANGED it; otherwise the detected bank is used.
-    final prefilledBank = (transaction.merchantName ?? '').trim();
-    final explicitBank =
-        (bankText.isNotEmpty && bankText != prefilledBank) ? bankText : null;
+    // A bank choice only completes an unknown bank. Merchant text is never
+    // treated as an issuing-bank identity or allowed to replace a known bank.
+    final explicitBank = rules.bank && bankText.isNotEmpty
+        ? (BankCatalog.byIdentity(bankText)?.name ?? bankText)
+        : null;
 
     final cardLast4 = normalizeCardLast4(draft.last4Text.trim());
+    if (draft.last4Text.trim().isNotEmpty && cardLast4 == null) {
+      throw const TransactionEditFailure('last4');
+    }
     // The edited row is written WITHOUT relying on the card id the stale
     // in-memory object carries. The authoritative assignment happens inside the
     // learning step below, in the SAME commit as the confirmed Last 4. Writing
@@ -126,11 +211,7 @@ class SaveTransactionEdit {
       type: draft.type,
       amountMinor: draft.amountMinor,
       currency: draft.currency,
-      status: transaction.status == TransactionStatus.pending &&
-              transaction.source == TransactionSource.sms &&
-              draft.currency == 'EGP'
-          ? TransactionStatus.confirmed
-          : transaction.status,
+      status: transaction.status,
       transactionDate: draft.transactionDate,
       bankId: bankId,
       // The Last 4 the user typed is persisted on the row even when the bank is
@@ -139,6 +220,12 @@ class SaveTransactionEdit {
       cardLast4: cardLast4 ?? transaction.cardLast4,
       categoryId: draft.categoryId,
       merchantName: draft.merchantName,
+      notes: draft.additionalNote?.trim().isNotEmpty == true
+          ? [
+              if (transaction.notes?.isNotEmpty == true) transaction.notes!,
+              draft.additionalNote!.trim(),
+            ].join('\n')
+          : transaction.notes,
       updatedAt: DateTime.now(),
     );
 
@@ -148,13 +235,29 @@ class SaveTransactionEdit {
       transaction: updated,
       syncRemote: false,
     );
+    final repository = transactionRepository;
+    if (repository is TransactionEvidenceRepository) {
+      await (repository as TransactionEvidenceRepository).completeEvidence(
+        userId,
+        transaction.id,
+        bankName: explicitBank,
+        type: rules.type ? draft.type : null,
+        amountMinor: rules.amount ? draft.amountMinor : null,
+        currency: rules.currency ? draft.currency : null,
+      );
+    }
 
     SmartResolutionResult? learned;
-    if (cardLast4 != null) {
-      trace('[SMART CARD] Save started userId=$userId '
-          'txn=${transaction.id} last4Raw=${draft.last4Text.trim()} '
-          'last4Normalized=$cardLast4 '
-          'bankRaw=${explicitBank ?? '<from detection>'}');
+    if (cardLast4 != null &&
+        (transaction.cardId?.isEmpty != false ||
+            rules.last4 ||
+            explicitBank != null)) {
+      trace(
+        '[SMART CARD] Save started userId=$userId '
+        'txn=${transaction.id} last4Raw=${draft.last4Text.trim()} '
+        'last4Normalized=$cardLast4 '
+        'bankRaw=${explicitBank ?? '<from detection>'}',
+      );
       // Resolves the identity, then commits `card_last4` + `card_id` for the
       // edited row AND every provable match, in ONE Drift transaction.
       learned = await moneyRepository.learnCardIdentity(
@@ -165,10 +268,12 @@ class SaveTransactionEdit {
       );
       final result = learned;
       {
-        trace('[SMART CARD] propagation committed '
-            'cardId=${result.resolution.cardId} '
-            'propagated=${result.propagatedTransactionIds.length} '
-            'totalAssigned=${result.totalAssigned}');
+        trace(
+          '[SMART CARD] propagation committed '
+          'cardId=${result.resolution.cardId} '
+          'propagated=${result.propagatedTransactionIds.length} '
+          'totalAssigned=${result.totalAssigned}',
+        );
       }
     }
 
@@ -198,11 +303,12 @@ class SaveTransactionEdit {
     // told, and is never awaited. A failure here cannot affect what the user
     // just saved locally.
     final committedForMirror = (await transactionRepository.getTransactions(
-            userId: userId, syncWithRemote: false))
-        .where((t) => t.id == transaction.id)
-        .firstOrNull;
-    transactionRepository
-        .mirrorTransactionInBackground(committedForMirror ?? updated);
+      userId: userId,
+      syncWithRemote: false,
+    )).where((t) => t.id == transaction.id).firstOrNull;
+    transactionRepository.mirrorTransactionInBackground(
+      committedForMirror ?? updated,
+    );
 
     return learned;
   }
@@ -224,17 +330,21 @@ class SaveTransactionEdit {
     String? expectedCardId,
   }) async {
     try {
-      Future<Transaction?> read() async => (await transactionRepository
-              .getTransactions(userId: userId, syncWithRemote: false))
-          .where((r) => r.id == transactionId)
-          .firstOrNull;
+      Future<Transaction?> read() async =>
+          (await transactionRepository.getTransactions(
+            userId: userId,
+            syncWithRemote: false,
+          )).where((r) => r.id == transactionId).firstOrNull;
 
       final committed = await read();
-      trace('[VERIFY DB] transactionId=$transactionId '
-          'cardLast4=${committed?.cardLast4} cardId=${committed?.cardId}');
+      trace(
+        '[VERIFY DB] transactionId=$transactionId '
+        'cardLast4=${committed?.cardLast4} cardId=${committed?.cardId}',
+      );
 
       if (committed == null) return;
-      final last4Ok = expectedLast4 == null ||
+      final last4Ok =
+          expectedLast4 == null ||
           normalizeCardLast4(committed.cardLast4) == expectedLast4;
       final cardIdOk =
           expectedCardId == null || committed.cardId == expectedCardId;
@@ -242,17 +352,21 @@ class SaveTransactionEdit {
 
       // Something overwrote the confirmed identity. Re-assert it so the
       // committed state is the one the user explicitly confirmed.
-      trace('[VERIFY DB] repairing committed row txn=$transactionId '
-          'expectedLast4=$expectedLast4 expectedCardId=$expectedCardId '
-          'foundLast4=${committed.cardLast4} foundCardId=${committed.cardId}');
+      trace(
+        '[VERIFY DB] repairing committed row txn=$transactionId '
+        'expectedLast4=$expectedLast4 expectedCardId=$expectedCardId '
+        'foundLast4=${committed.cardLast4} foundCardId=${committed.cardId}',
+      );
       await transactionRepository.restoreCardIdentity(
         transaction: committed,
         cardId: expectedCardId,
         last4: expectedLast4,
       );
       final repaired = await read();
-      trace('[VERIFY DB] repaired txn=$transactionId '
-          'cardLast4=${repaired?.cardLast4} cardId=${repaired?.cardId}');
+      trace(
+        '[VERIFY DB] repaired txn=$transactionId '
+        'cardLast4=${repaired?.cardLast4} cardId=${repaired?.cardId}',
+      );
     } catch (e) {
       reportError('[VERIFY DB] read-back failed txn=$transactionId', e);
     }
@@ -262,7 +376,9 @@ class SaveTransactionEdit {
   /// the balances use, so the badge can never disagree with the figures.
   Future<void> _recomputeCardCounts() async {
     final transactions = await transactionRepository.getTransactions(
-        userId: userId, syncWithRemote: false);
+      userId: userId,
+      syncWithRemote: false,
+    );
     final cards = await cardRepository.getCards(userId);
     await cardRepository.recomputeTransactionCountsForCards(
       userId,

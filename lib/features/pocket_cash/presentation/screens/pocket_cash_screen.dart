@@ -77,7 +77,7 @@ class _PocketCashScreenState extends State<PocketCashScreen> {
                         style: const TextStyle(color: Colors.white70)),
                     const SizedBox(height: 8),
                     Text(
-                      '${_formatMinor(balance)} EGP',
+                      '${_formatMinor(balance)} ${l.currencySymbol('EGP')}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 36,
@@ -104,6 +104,13 @@ class _PocketCashScreenState extends State<PocketCashScreen> {
     );
   }
 
+  String _movementLabel(AppLocalizations l, String type) => l[switch(type) {
+    'atm_withdrawal' => 'movementAtm', 'cash_expense' => 'movementCashExpense',
+    'income' => 'movementIncome', 'in' || 'manual_in' => 'movementIn',
+    'out' || 'manual_out' => 'movementOut', 'item_purchase' => 'movementItemPurchase',
+    _ => 'movementAdjustment',
+  }];
+
   Widget _buildMovements(List<CashMovement> movements) {
     final l = AppLocalizations.s(context);
     if (movements.isEmpty) {
@@ -119,7 +126,7 @@ class _PocketCashScreenState extends State<PocketCashScreen> {
         return Card(
           child: ListTile(
             leading: Icon(_movementIcon(m.type)),
-            title: Text(m.description ?? m.type),
+            title: Text(m.description ?? _movementLabel(l, m.type)),
             subtitle:
                 Text(m.movementDate.toLocal().toString().substring(0, 16)),
             trailing: Text(

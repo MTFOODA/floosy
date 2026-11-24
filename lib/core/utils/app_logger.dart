@@ -1,17 +1,20 @@
-import 'package:logger/logger.dart';
+import 'package:flutter/foundation.dart';
 
-/// Central application logger. Replaces raw `print` calls in production
-/// code so that log output is leveled, filterable and strip-able.
-final Logger _logger = Logger(
-  printer: PrettyPrinter(
-      methodCount: 0, dateTimeFormat: DateTimeFormat.none, colors: false),
-);
+/// Call sites may contain financial values or SDK exception payloads. Never
+/// print caller messages, exceptions, stacks, IDs, amounts, senders or bodies.
+/// Release builds are silent; debug builds expose only fixed severity markers.
+void logDebug(String message) {
+  if (kDebugMode) debugPrint('FLOOSY_DEBUG_EVENT');
+}
 
-void logDebug(String message) => _logger.d(message);
+void logInfo(String message) {
+  if (kDebugMode) debugPrint('FLOOSY_INFO_EVENT');
+}
 
-void logInfo(String message) => _logger.i(message);
+void logWarning(String message) {
+  if (kDebugMode) debugPrint('FLOOSY_WARNING_EVENT');
+}
 
-void logWarning(String message) => _logger.w(message);
-
-void logError(String message, [Object? error, StackTrace? stackTrace]) =>
-    _logger.e(message, error: error, stackTrace: stackTrace);
+void logError(String message, [Object? error, StackTrace? stackTrace]) {
+  if (kDebugMode) debugPrint('FLOOSY_ERROR_EVENT');
+}

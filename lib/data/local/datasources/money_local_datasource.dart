@@ -18,7 +18,9 @@ class MoneyLocalDataSource {
   /// relationship, requirement #5). Used by the SMS pipeline right after a
   /// card is upserted so the transaction is linked by a stable id.
   Future<void> updateTransactionCardId(
-      String transactionId, String cardId) async {
+    String transactionId,
+    String cardId,
+  ) async {
     await (_db.update(_db.transactions)
           ..where((t) => t.id.equals(transactionId)))
         .write(db.TransactionsCompanion(cardId: Value(cardId)));
@@ -45,9 +47,10 @@ class MoneyLocalDataSource {
       // Re-apply the "unresolved only" guard inside the transaction so a row
       // that gained an explicit assignment between planning and writing is
       // left alone instead of being clobbered.
-      updated = await (_db.update(_db.transactions)
-            ..where((t) => t.id.isIn(transactionIds) & t.cardId.isNull()))
-          .write(db.TransactionsCompanion(cardId: Value(cardId)));
+      updated =
+          await (_db.update(_db.transactions)
+                ..where((t) => t.id.isIn(transactionIds) & t.cardId.isNull()))
+              .write(db.TransactionsCompanion(cardId: Value(cardId)));
     });
     return updated;
   }
@@ -90,13 +93,16 @@ class MoneyLocalDataSource {
     var written = 0;
     await _db.transaction(() async {
       // 1. The transaction the user explicitly edited/confirmed.
-      written += await (_db.update(_db.transactions)
-            ..where((t) => t.id.equals(transactionId)))
-          .write(db.TransactionsCompanion(
-        cardLast4: Value(last4),
-        cardId: Value(cardId),
-        updatedAt: Value(DateTime.now()),
-      ));
+      written +=
+          await (_db.update(
+            _db.transactions,
+          )..where((t) => t.id.equals(transactionId))).write(
+            db.TransactionsCompanion(
+              cardLast4: Value(last4),
+              cardId: Value(cardId),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
 
       // 2. The other rows proven to carry the same identity. `card_id IS NULL`
       //    is re-checked INSIDE the transaction so a row that gained an
@@ -105,13 +111,16 @@ class MoneyLocalDataSource {
           .where((id) => id != transactionId)
           .toList(growable: false);
       if (others.isNotEmpty) {
-        written += await (_db.update(_db.transactions)
-              ..where((t) => t.id.isIn(others) & t.cardId.isNull()))
-            .write(db.TransactionsCompanion(
-          cardLast4: Value(last4),
-          cardId: Value(cardId),
-          updatedAt: Value(DateTime.now()),
-        ));
+        written +=
+            await (_db.update(
+              _db.transactions,
+            )..where((t) => t.id.isIn(others) & t.cardId.isNull())).write(
+              db.TransactionsCompanion(
+                cardLast4: Value(last4),
+                cardId: Value(cardId),
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
       }
     });
     return written;
@@ -281,46 +290,59 @@ class MoneyLocalDataSource {
 
     await _db.transaction(() async {
       // 1. The transaction the user explicitly edited and confirmed.
-      editedRows = await (_db.update(_db.transactions)
-            ..where((t) => t.id.equals(transactionId)))
-          .write(db.TransactionsCompanion(
-        cardLast4: Value(last4),
-        cardId: Value(cardId),
-        updatedAt: Value(DateTime.now()),
-      ));
+      editedRows =
+          await (_db.update(
+            _db.transactions,
+          )..where((t) => t.id.equals(transactionId))).write(
+            db.TransactionsCompanion(
+              cardLast4: Value(last4),
+              cardId: Value(cardId),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
 
       if (siblings.isNotEmpty) {
         // 2. Every same-user/same-bank sibling that was missing the Last 4.
         //    Independent of card_id, so a row with explicit ownership still
         //    gets the number it was missing.
-        siblingLast4Rows = await (_db.update(_db.transactions)
-              ..where((t) => t.id.isIn(siblings) & t.cardLast4.isNull()))
-            .write(db.TransactionsCompanion(
-          cardLast4: Value(last4),
-          updatedAt: Value(DateTime.now()),
-        ));
+        siblingLast4Rows =
+            await (_db.update(
+              _db.transactions,
+            )..where((t) => t.id.isIn(siblings) & t.cardLast4.isNull())).write(
+              db.TransactionsCompanion(
+                cardLast4: Value(last4),
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
 
         // 3. Card ownership, only where it is still unassigned.
-        siblingCardRows = await (_db.update(_db.transactions)
-              ..where((t) => t.id.isIn(siblings) & t.cardId.isNull()))
-            .write(db.TransactionsCompanion(
-          cardId: Value(cardId),
-          updatedAt: Value(DateTime.now()),
-        ));
+        siblingCardRows =
+            await (_db.update(
+              _db.transactions,
+            )..where((t) => t.id.isIn(siblings) & t.cardId.isNull())).write(
+              db.TransactionsCompanion(
+                cardId: Value(cardId),
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
       }
 
       if (fillSmsDetections) {
         final affected = <String>[transactionId, ...siblings];
         // 4. The originating detection record of every affected transaction,
         //    joined on the persisted relationship, never on content matching.
-        smsRows = await (_db.update(_db.smsMessages)
-              ..where((s) =>
-                  s.transactionId.isIn(affected) &
-                  s.detectedCardLast4.isNull()))
-            .write(db.SmsMessagesCompanion(
-          detectedCardLast4: Value(last4),
-          cardLast4Identified: const Value(true),
-        ));
+        smsRows =
+            await (_db.update(_db.smsMessages)..where(
+                  (s) =>
+                      s.transactionId.isIn(affected) &
+                      s.detectedCardLast4.isNull(),
+                ))
+                .write(
+                  db.SmsMessagesCompanion(
+                    detectedCardLast4: Value(last4),
+                    cardLast4Identified: const Value(true),
+                  ),
+                );
       }
     });
 
@@ -335,9 +357,9 @@ class MoneyLocalDataSource {
   /// Ids of the user's transactions that are still awaiting a card assignment.
   /// Used to scope propagation to unresolved rows only.
   Future<List<String>> getUnlinkedTransactionIds(String userId) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) => t.userId.equals(userId) & t.cardId.isNull()))
-        .get();
+    final rows = await (_db.select(
+      _db.transactions,
+    )..where((t) => t.userId.equals(userId) & t.cardId.isNull())).get();
     return rows.map((r) => r.id).toList();
   }
 
@@ -360,30 +382,36 @@ class MoneyLocalDataSource {
     required String userId,
     required String last4,
   }) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.cardId.isNull() &
-              t.cardLast4.equals(last4)))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.cardId.isNull() &
+                  t.cardLast4.equals(last4),
+            ))
+            .get();
     return rows.map((r) => r.id).toList();
   }
 
   // ── Monthly income ─────────────────────────────────────────────────────────
 
   Future<void> insertMonthlyIncome(MonthlyIncome income) async {
-    await _db.into(_db.monthlyIncomes).insert(db.MonthlyIncomesCompanion(
-          id: Value(income.id),
-          userId: Value(income.userId),
-          year: Value(income.year),
-          month: Value(income.month),
-          label: Value(income.label),
-          amountMinor: Value(income.amountMinor),
-          currency: Value(income.currency),
-          bankAccountId: Value(income.bankAccountId),
-          createdAt: Value(income.createdAt ?? DateTime.now()),
-          updatedAt: Value(income.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.monthlyIncomes)
+        .insert(
+          db.MonthlyIncomesCompanion(
+            id: Value(income.id),
+            userId: Value(income.userId),
+            year: Value(income.year),
+            month: Value(income.month),
+            label: Value(income.label),
+            amountMinor: Value(income.amountMinor),
+            currency: Value(income.currency),
+            bankAccountId: Value(income.bankAccountId),
+            createdAt: Value(income.createdAt ?? DateTime.now()),
+            updatedAt: Value(income.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<MonthlyIncome>> getMonthlyIncomes(
@@ -407,14 +435,17 @@ class MoneyLocalDataSource {
   }
 
   Future<void> updateMonthlyIncome(MonthlyIncome income) async {
-    await (_db.update(_db.monthlyIncomes)..where((t) => t.id.equals(income.id)))
-        .write(db.MonthlyIncomesCompanion(
-      label: Value(income.label),
-      amountMinor: Value(income.amountMinor),
-      currency: Value(income.currency),
-      bankAccountId: Value(income.bankAccountId),
-      updatedAt: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.monthlyIncomes,
+    )..where((t) => t.id.equals(income.id))).write(
+      db.MonthlyIncomesCompanion(
+        label: Value(income.label),
+        amountMinor: Value(income.amountMinor),
+        currency: Value(income.currency),
+        bankAccountId: Value(income.bankAccountId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<void> deleteMonthlyIncome(String id) async {
@@ -424,58 +455,67 @@ class MoneyLocalDataSource {
   // ── Bank accounts ──────────────────────────────────────────────────────────
 
   Future<void> insertBankAccount(UserBankAccount account) async {
-    await _db.into(_db.bankAccounts).insert(db.BankAccountsCompanion(
-          id: Value(account.id),
-          userId: Value(account.userId),
-          name: Value(account.name),
-          bankId: Value(account.bankId),
-          accountLast4: Value(account.accountLast4),
-          openingBalanceMinor: Value(account.openingBalanceMinor),
-          currency: Value(account.currency),
-          isActive: Value(account.isActive),
-          createdAt: Value(account.createdAt ?? DateTime.now()),
-          updatedAt: Value(account.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.bankAccounts)
+        .insert(
+          db.BankAccountsCompanion(
+            id: Value(account.id),
+            userId: Value(account.userId),
+            name: Value(account.name),
+            bankId: Value(account.bankId),
+            accountLast4: Value(account.accountLast4),
+            openingBalanceMinor: Value(account.openingBalanceMinor),
+            currency: Value(account.currency),
+            isActive: Value(account.isActive),
+            createdAt: Value(account.createdAt ?? DateTime.now()),
+            updatedAt: Value(account.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<UserBankAccount>> getBankAccounts(String userId) async {
-    final rows = await (_db.select(_db.bankAccounts)
-          ..where((t) => t.userId.equals(userId))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
-        .get();
+    final rows =
+        await (_db.select(_db.bankAccounts)
+              ..where((t) => t.userId.equals(userId))
+              ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
+            .get();
     return rows.map(_mapBankAccount).toList();
   }
 
   Future<UserBankAccount?> getBankAccount(String accountId) async {
-    final row = await (_db.select(_db.bankAccounts)
-          ..where((t) => t.id.equals(accountId)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.bankAccounts,
+    )..where((t) => t.id.equals(accountId))).getSingleOrNull();
     return row == null ? null : _mapBankAccount(row);
   }
 
   Future<void> updateBankAccount(UserBankAccount account) async {
-    await (_db.update(_db.bankAccounts)..where((t) => t.id.equals(account.id)))
-        .write(db.BankAccountsCompanion(
-      name: Value(account.name),
-      bankId: Value(account.bankId),
-      accountLast4: Value(account.accountLast4),
-      openingBalanceMinor: Value(account.openingBalanceMinor),
-      currency: Value(account.currency),
-      isActive: Value(account.isActive),
-      updatedAt: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.bankAccounts,
+    )..where((t) => t.id.equals(account.id))).write(
+      db.BankAccountsCompanion(
+        name: Value(account.name),
+        bankId: Value(account.bankId),
+        accountLast4: Value(account.accountLast4),
+        openingBalanceMinor: Value(account.openingBalanceMinor),
+        currency: Value(account.currency),
+        isActive: Value(account.isActive),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<void> deleteBankAccount(String accountId) async {
-    await (_db.delete(_db.bankAccounts)..where((t) => t.id.equals(accountId)))
-        .go();
+    await (_db.delete(
+      _db.bankAccounts,
+    )..where((t) => t.id.equals(accountId))).go();
   }
 
   /// Derived balance for an account = opening + Σ(in) − Σ(out).
   Future<int> getBankAccountBalance(String accountId) async {
-    final rows = await (_db.select(_db.bankMovements)
-          ..where((t) => t.accountId.equals(accountId)))
-        .get();
+    final rows = await (_db.select(
+      _db.bankMovements,
+    )..where((t) => t.accountId.equals(accountId))).get();
     final account = await getBankAccount(accountId);
     var balance = account?.openingBalanceMinor ?? 0;
     for (final m in rows) {
@@ -487,37 +527,44 @@ class MoneyLocalDataSource {
   // ── Bank movements (ledger) ────────────────────────────────────────────────
 
   Future<void> insertBankMovement(BankAccountMovement movement) async {
-    await _db.into(_db.bankMovements).insert(db.BankMovementsCompanion(
-          id: Value(movement.id),
-          accountId: Value(movement.accountId),
-          userId: Value(movement.userId),
-          type: Value(movement.type),
-          amountMinor: Value(movement.amountMinor),
-          description: Value(movement.description),
-          referenceType: Value(movement.referenceType),
-          referenceId: Value(movement.referenceId),
-          movementDate: Value(movement.movementDate),
-          createdAt: Value(movement.createdAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.bankMovements)
+        .insert(
+          db.BankMovementsCompanion(
+            id: Value(movement.id),
+            accountId: Value(movement.accountId),
+            userId: Value(movement.userId),
+            type: Value(movement.type),
+            amountMinor: Value(movement.amountMinor),
+            description: Value(movement.description),
+            referenceType: Value(movement.referenceType),
+            referenceId: Value(movement.referenceId),
+            movementDate: Value(movement.movementDate),
+            createdAt: Value(movement.createdAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<BankAccountMovement>> getBankMovements(String userId) async {
-    final rows = await (_db.select(_db.bankMovements)
-          ..where((t) => t.userId.equals(userId))
-          ..orderBy([
-            (t) => OrderingTerm(
-                expression: t.movementDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.bankMovements)
+              ..where((t) => t.userId.equals(userId))
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.movementDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
     return rows.map(_mapBankMovement).toList();
   }
 
   // ── Pocket cash ────────────────────────────────────────────────────────────
 
   Future<CashWallet?> getWallet(String userId) async {
-    final row = await (_db.select(_db.cashWallets)
-          ..where((t) => t.userId.equals(userId)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.cashWallets,
+    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
     return row == null
         ? null
         : CashWallet(
@@ -525,41 +572,51 @@ class MoneyLocalDataSource {
             userId: row.userId,
             currency: row.currency,
             createdAt: row.createdAt,
-            updatedAt: row.updatedAt);
+            updatedAt: row.updatedAt,
+          );
   }
 
   Future<void> insertWallet(CashWallet wallet) async {
-    await _db.into(_db.cashWallets).insert(db.CashWalletsCompanion(
-          id: Value(wallet.id),
-          userId: Value(wallet.userId),
-          currency: Value(wallet.currency),
-          createdAt: Value(wallet.createdAt ?? DateTime.now()),
-          updatedAt: Value(wallet.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.cashWallets)
+        .insert(
+          db.CashWalletsCompanion(
+            id: Value(wallet.id),
+            userId: Value(wallet.userId),
+            currency: Value(wallet.currency),
+            createdAt: Value(wallet.createdAt ?? DateTime.now()),
+            updatedAt: Value(wallet.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<void> insertCashMovement(CashMovement movement) async {
-    await _db.into(_db.cashMovements).insert(db.CashMovementsCompanion(
-          id: Value(movement.id),
-          userId: Value(movement.userId),
-          walletId: Value(movement.walletId),
-          type: Value(movement.type),
-          amountMinor: Value(movement.amountMinor),
-          referenceType: Value(movement.referenceType),
-          referenceId: Value(movement.referenceId),
-          description: Value(movement.description),
-          movementDate: Value(movement.movementDate),
-          createdAt: Value(movement.createdAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.cashMovements)
+        .insert(
+          db.CashMovementsCompanion(
+            id: Value(movement.id),
+            userId: Value(movement.userId),
+            walletId: Value(movement.walletId),
+            type: Value(movement.type),
+            amountMinor: Value(movement.amountMinor),
+            referenceType: Value(movement.referenceType),
+            referenceId: Value(movement.referenceId),
+            description: Value(movement.description),
+            movementDate: Value(movement.movementDate),
+            createdAt: Value(movement.createdAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<int> getCashBalance(String userId) async {
-    final rows = await (_db.select(_db.cashMovements)
-          ..where((t) => t.userId.equals(userId)))
-        .get();
+    final rows = await (_db.select(
+      _db.cashMovements,
+    )..where((t) => t.userId.equals(userId))).get();
     var balance = 0;
     for (final m in rows) {
-      balance += (m.type == 'atm_withdrawal' ||
+      balance +=
+          (m.type == 'atm_withdrawal' ||
               m.type == 'income' ||
               m.type == 'in' ||
               m.type == 'manual_in' ||
@@ -573,52 +630,70 @@ class MoneyLocalDataSource {
   // ── Item usage ─────────────────────────────────────────────────────────────
 
   Future<void> insertItemUsage(models.ItemUsage usage) async {
-    await _db.into(_db.itemUsages).insert(db.ItemUsagesCompanion(
-          id: Value(usage.id),
-          userId: Value(usage.userId),
-          itemId: Value(usage.itemId),
-          expenseId: Value(usage.expenseId),
-          quantity: Value(usage.quantity),
-          totalAmountMinor: Value(usage.totalAmountMinor),
-          usageDate: Value(usage.usageDate),
-          createdAt: Value(usage.createdAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.itemUsages)
+        .insert(
+          db.ItemUsagesCompanion(
+            id: Value(usage.id),
+            userId: Value(usage.userId),
+            itemId: Value(usage.itemId),
+            expenseId: Value(usage.expenseId),
+            quantity: Value(usage.quantity),
+            totalAmountMinor: Value(usage.totalAmountMinor),
+            usageDate: Value(usage.usageDate),
+            createdAt: Value(usage.createdAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<void> queueItemCashSync(String userId, String transactionId) async {
-    await _db.into(_db.syncQueue).insert(
-        db.SyncQueueCompanion.insert(
+    await _db
+        .into(_db.syncQueue)
+        .insert(
+          db.SyncQueueCompanion.insert(
             id: 'item-cash-$transactionId',
             userId: userId,
             entityType: 'item_cash_movement',
             entityId: transactionId,
-            operation: 'insert'),
-        mode: InsertMode.insertOrIgnore);
+            operation: 'insert',
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
   }
 
   Future<List<String>> pendingItemCashSync(String userId) async {
-    final rows = await (_db.select(_db.syncQueue)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.entityType.equals('item_cash_movement') &
-              t.status.equals('pending'))
-          ..limit(50))
-        .get();
+    final rows =
+        await (_db.select(_db.syncQueue)
+              ..where(
+                (t) =>
+                    t.userId.equals(userId) &
+                    t.entityType.equals('item_cash_movement') &
+                    t.status.equals('pending'),
+              )
+              ..limit(50))
+            .get();
     return rows.map((r) => r.entityId).toList();
   }
 
   Future<void> markItemCashSynced(String userId, String transactionId) async {
-    await (_db.update(_db.syncQueue)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.id.equals('item-cash-$transactionId')))
-        .write(db.SyncQueueCompanion(
-            status: const Value('synced'), updatedAt: Value(DateTime.now())));
+    await (_db.update(_db.syncQueue)..where(
+          (t) =>
+              t.userId.equals(userId) & t.id.equals('item-cash-$transactionId'),
+        ))
+        .write(
+          db.SyncQueueCompanion(
+            status: const Value('synced'),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
   }
 
   /// Count confirmed purchases only; orphaned/cancelled usage is excluded.
   Future<Map<String, int>> getConfirmedItemUsageCounts(
-      String userId, int year, int month) async {
+    String userId,
+    int year,
+    int month,
+  ) async {
     final usages = _db.itemUsages;
     final expenses = _db.expenses;
     final transactions = _db.transactions;
@@ -628,26 +703,33 @@ class MoneyLocalDataSource {
       ..join([
         innerJoin(expenses, expenses.id.equalsExp(usages.expenseId)),
         innerJoin(
-            transactions, transactions.id.equalsExp(expenses.transactionId)),
+          transactions,
+          transactions.id.equalsExp(expenses.transactionId),
+        ),
       ])
-      ..where(usages.userId.equals(userId) &
-          expenses.userId.equals(userId) &
-          transactions.userId.equals(userId) &
-          usages.quantity.isBiggerThanValue(0) &
-          transactions.status
-              .equals(models.TransactionStatus.confirmed.toString()) &
-          transactions.type.isIn([
-            models.TransactionType.cash_expense.toString(),
-            models.TransactionType.purchase.toString(),
-          ]) &
-          transactions.transactionDate
-              .isBiggerOrEqualValue(DateTime(year, month)) &
-          transactions.transactionDate
-              .isSmallerThanValue(DateTime(year, month + 1)))
+      ..where(
+        usages.userId.equals(userId) &
+            expenses.userId.equals(userId) &
+            transactions.userId.equals(userId) &
+            usages.quantity.isBiggerThanValue(0) &
+            transactions.status.equals(
+              models.TransactionStatus.confirmed.toString(),
+            ) &
+            transactions.type.isIn([
+              models.TransactionType.cash_expense.toString(),
+              models.TransactionType.purchase.toString(),
+            ]) &
+            transactions.transactionDate.isBiggerOrEqualValue(
+              DateTime(year, month),
+            ) &
+            transactions.transactionDate.isSmallerThanValue(
+              DateTime(year, month + 1),
+            ),
+      )
       ..groupBy([usages.itemId]);
     return {
       for (final row in await query.get())
-        row.read(usages.itemId)!: row.read(quantity) ?? 0
+        row.read(usages.itemId)!: row.read(quantity) ?? 0,
     };
   }
 
@@ -662,7 +744,8 @@ class MoneyLocalDataSource {
         if (year != null && month != null) {
           final start = DateTime(year, month, 1);
           final end = DateTime(year, month + 1, 1);
-          expr = expr &
+          expr =
+              expr &
               t.usageDate.isBiggerOrEqualValue(start) &
               t.usageDate.isSmallerThanValue(end);
         }
@@ -671,16 +754,18 @@ class MoneyLocalDataSource {
       ..orderBy([(t) => OrderingTerm(expression: t.usageDate)]);
     final rows = await query.get();
     return rows
-        .map((u) => models.ItemUsage(
-              id: u.id,
-              userId: u.userId,
-              itemId: u.itemId,
-              expenseId: u.expenseId,
-              quantity: u.quantity,
-              totalAmountMinor: u.totalAmountMinor,
-              usageDate: u.usageDate,
-              createdAt: u.createdAt,
-            ))
+        .map(
+          (u) => models.ItemUsage(
+            id: u.id,
+            userId: u.userId,
+            itemId: u.itemId,
+            expenseId: u.expenseId,
+            quantity: u.quantity,
+            totalAmountMinor: u.totalAmountMinor,
+            usageDate: u.usageDate,
+            createdAt: u.createdAt,
+          ),
+        )
         .toList();
   }
 
@@ -690,13 +775,15 @@ class MoneyLocalDataSource {
   Future<int> getDeductedForMonth(String userId, int year, int month) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end)))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end),
+            ))
+            .get();
     var total = 0;
     for (final row in rows) {
       final type = _parseTransactionType(row.type);
@@ -710,13 +797,15 @@ class MoneyLocalDataSource {
   Future<int> getIncomingForMonth(String userId, int year, int month) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end)))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end),
+            ))
+            .get();
     var total = 0;
     for (final row in rows) {
       final type = _parseTransactionType(row.type);
@@ -753,28 +842,29 @@ class MoneyLocalDataSource {
   }) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) {
-            final Expression<bool> byLast4 = t.cardLast4.equals(cardLast4);
-            final Expression<bool> unlinked = t.cardId.isNull() & byLast4;
-            final Expression<bool> ownership;
-            if (onlyUnlinkedByLast4) {
-              ownership = unlinked;
-            } else if (cardId == null) {
-              ownership =
-                  includeUnlinkedByLast4 ? byLast4 : const Constant(false);
-            } else {
-              ownership = includeUnlinkedByLast4
-                  ? (t.cardId.equals(cardId) | unlinked)
-                  : t.cardId.equals(cardId);
-            }
-            return t.userId.equals(userId) &
-                ownership &
-                t.status.equals('TransactionStatus.confirmed') &
-                t.transactionDate.isBiggerOrEqualValue(start) &
-                t.transactionDate.isSmallerThanValue(end);
-          }))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where((t) {
+              final Expression<bool> byLast4 = t.cardLast4.equals(cardLast4);
+              final Expression<bool> unlinked = t.cardId.isNull() & byLast4;
+              final Expression<bool> ownership;
+              if (onlyUnlinkedByLast4) {
+                ownership = unlinked;
+              } else if (cardId == null) {
+                ownership = includeUnlinkedByLast4
+                    ? byLast4
+                    : const Constant(false);
+              } else {
+                ownership = includeUnlinkedByLast4
+                    ? (t.cardId.equals(cardId) | unlinked)
+                    : t.cardId.equals(cardId);
+              }
+              return t.userId.equals(userId) &
+                  ownership &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end);
+            }))
+            .get();
     var total = 0;
     for (final row in rows) {
       final type = _parseTransactionType(row.type);
@@ -793,17 +883,19 @@ class MoneyLocalDataSource {
   }) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              (cardId == null
-                  ? t.cardLast4.equals(cardLast4)
-                  : t.cardId.equals(cardId)) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end) &
-              t.type.equals('TransactionType.atm_withdrawal')))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  (cardId == null
+                      ? t.cardLast4.equals(cardLast4)
+                      : t.cardId.equals(cardId)) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end) &
+                  t.type.equals('TransactionType.atm_withdrawal'),
+            ))
+            .get();
     var total = 0;
     for (final row in rows) {
       total += row.amountMinor;
@@ -821,21 +913,23 @@ class MoneyLocalDataSource {
   }) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              (cardId == null
-                  ? t.cardLast4.equals(cardLast4)
-                  : t.cardId.equals(cardId)) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end) &
-              t.type.isIn([
-                'TransactionType.income',
-                'TransactionType.transfer_in',
-                'TransactionType.refund',
-              ])))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  (cardId == null
+                      ? t.cardLast4.equals(cardLast4)
+                      : t.cardId.equals(cardId)) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end) &
+                  t.type.isIn([
+                    'TransactionType.income',
+                    'TransactionType.transfer_in',
+                    'TransactionType.refund',
+                  ]),
+            ))
+            .get();
     var total = 0;
     for (final row in rows) {
       total += row.amountMinor;
@@ -853,17 +947,19 @@ class MoneyLocalDataSource {
   }) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              (cardId == null
-                  ? t.cardLast4.equals(cardLast4)
-                  : t.cardId.equals(cardId)) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end) &
-              t.type.equals(models.TransactionType.cash_expense.toString())))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  (cardId == null
+                      ? t.cardLast4.equals(cardLast4)
+                      : t.cardId.equals(cardId)) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end) &
+                  t.type.equals(models.TransactionType.cash_expense.toString()),
+            ))
+            .get();
     var total = 0;
     for (final row in rows) {
       total += row.amountMinor;
@@ -882,13 +978,15 @@ class MoneyLocalDataSource {
   /// Dashboard "My Balance" card (which is derived from bank balances) would
   /// silently hide it. This method adds exactly those rows back.
   Future<int> getUnrepresentedIncomingSum(String userId) async {
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.status.equals('TransactionStatus.confirmed') &
-              (t.type.equals('TransactionType.income') |
-                  t.type.equals('TransactionType.transfer_in'))))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  (t.type.equals('TransactionType.income') |
+                      t.type.equals('TransactionType.transfer_in')),
+            ))
+            .get();
     final movements = await getBankMovements(userId);
     final referenced = movements
         .where((m) => m.referenceId != null && m.referenceId!.isNotEmpty)
@@ -906,16 +1004,21 @@ class MoneyLocalDataSource {
 
   /// Confirmed transactions in a month grouped by type name.
   Future<Map<String, int>> getMonthlyBreakdown(
-      String userId, int year, int month) async {
+    String userId,
+    int year,
+    int month,
+  ) async {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 1);
-    final rows = await (_db.select(_db.transactions)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.status.equals('TransactionStatus.confirmed') &
-              t.transactionDate.isBiggerOrEqualValue(start) &
-              t.transactionDate.isSmallerThanValue(end)))
-        .get();
+    final rows =
+        await (_db.select(_db.transactions)..where(
+              (t) =>
+                  t.userId.equals(userId) &
+                  t.status.equals('TransactionStatus.confirmed') &
+                  t.transactionDate.isBiggerOrEqualValue(start) &
+                  t.transactionDate.isSmallerThanValue(end),
+            ))
+            .get();
     final result = <String, int>{};
     for (final row in rows) {
       result[row.type] = (result[row.type] ?? 0) + row.amountMinor;
@@ -928,7 +1031,7 @@ class MoneyLocalDataSource {
     return incomes.fold<int>(0, (sum, i) => sum + i.amountMinor);
   }
 
-  Future<void> runInTransaction(Future<void> Function() action) {
+  Future<T> runInTransaction<T>(Future<T> Function() action) {
     return _db.transaction(() async => action());
   }
 
@@ -937,15 +1040,17 @@ class MoneyLocalDataSource {
   // ── Deletion helpers (used by TransactionDataResetService) ──────────────
 
   Future<void> deleteMovementsForTransaction(String transactionId) async {
-    await (_db.delete(_db.bankMovements)
-          ..where((t) =>
+    await (_db.delete(_db.bankMovements)..where(
+          (t) =>
               t.referenceType.equals('transaction') &
-              t.referenceId.equals(transactionId)))
+              t.referenceId.equals(transactionId),
+        ))
         .go();
-    await (_db.delete(_db.cashMovements)
-          ..where((t) =>
+    await (_db.delete(_db.cashMovements)..where(
+          (t) =>
               t.referenceType.equals('transaction') &
-              t.referenceId.equals(transactionId)))
+              t.referenceId.equals(transactionId),
+        ))
         .go();
   }
 
@@ -966,17 +1071,18 @@ class MoneyLocalDataSource {
   }
 
   Future<List<BankAccountMovement>> getMovementsForAccount(
-      String accountId) async {
-    final rows = await (_db.select(_db.bankMovements)
-          ..where((t) => t.accountId.equals(accountId)))
-        .get();
+    String accountId,
+  ) async {
+    final rows = await (_db.select(
+      _db.bankMovements,
+    )..where((t) => t.accountId.equals(accountId))).get();
     return rows.map(_mapBankMovement).toList();
   }
 
   Future<List<CashMovement>> getCashMovements(String walletId) async {
-    final rows = await (_db.select(_db.cashMovements)
-          ..where((t) => t.walletId.equals(walletId)))
-        .get();
+    final rows = await (_db.select(
+      _db.cashMovements,
+    )..where((t) => t.walletId.equals(walletId))).get();
     return rows.map(_mapCashMovement).toList();
   }
 

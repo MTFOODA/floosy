@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../domain/entities/bank_directory.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
 import 'package:go_router/go_router.dart';
@@ -21,8 +22,9 @@ class DetectedCardsScreen extends StatelessWidget {
       backgroundColor: context.fc.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: FloosyDesign.horizontalPadding(context)
-              .copyWith(top: 16, bottom: 120),
+          padding: FloosyDesign.horizontalPadding(
+            context,
+          ).copyWith(top: 16, bottom: 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -46,8 +48,11 @@ class DetectedCardsScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: context.fc.borderSubtle),
                   ),
-                  child: Icon(Icons.arrow_back_rounded,
-                      color: context.fc.textPrimary, size: 20),
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    color: context.fc.textPrimary,
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -68,7 +73,10 @@ class DetectedCardsScreen extends StatelessWidget {
   }
 
   Widget _buildContent(
-      BuildContext context, AppLocalizations l, List<DetectedCard> cards) {
+    BuildContext context,
+    AppLocalizations l,
+    List<DetectedCard> cards,
+  ) {
     if (cards.isEmpty) {
       return _EmptyCardsView(l: l);
     }
@@ -89,29 +97,33 @@ class DetectedCardsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         // Card list — each card is tappable for customization.
-        ...cards.map((card) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                children: [
-                  DetectedBankCard(
-                    card: card,
-                    onEdit: () => _openCustomization(context, card),
-                    showEye: false,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${card.bankName ?? 'Bank'} •••• ${card.last4}',
-                    style: context.fc.bodyTextSmall,
-                  ),
-                ],
-              ),
-            )),
+        ...cards.map(
+          (card) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              children: [
+                DetectedBankCard(
+                  card: card,
+                  onEdit: () => _openCustomization(context, card),
+                  showEye: false,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${card.bankName == null ? AppLocalizations.s(context)['bankUnknown'] : BankCatalog.displayName(card.bankName, arabic: AppLocalizations.s(context).isArabic)} •••• ${card.last4}',
+                  style: context.fc.bodyTextSmall,
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
   Future<void> _openCustomization(
-      BuildContext context, DetectedCard card) async {
+    BuildContext context,
+    DetectedCard card,
+  ) async {
     final repo = context.read<CardsCubit>();
     final changed = await showModalBottomSheet<bool>(
       context: context,
@@ -151,8 +163,11 @@ class _EmptyCardsView extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.credit_card_outlined,
-                color: context.fc.textMuted.withValues(alpha: 0.5), size: 32),
+            child: Icon(
+              Icons.credit_card_outlined,
+              color: context.fc.textMuted.withValues(alpha: 0.5),
+              size: 32,
+            ),
           ),
           const SizedBox(height: 20),
           Text(l['noCardsDetected'], style: context.fc.sectionTitle),
@@ -177,10 +192,16 @@ class _ErrorView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 40),
-          Icon(Icons.error_outline,
-              size: 48, color: FloosyDesign.negative.withValues(alpha: 0.7)),
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: FloosyDesign.negative.withValues(alpha: 0.7),
+          ),
           const SizedBox(height: 12),
-          Text('Something went wrong', style: context.fc.bodyText),
+          Text(
+            AppLocalizations.s(context)['errorLoading'],
+            style: context.fc.bodyText,
+          ),
         ],
       ),
     );

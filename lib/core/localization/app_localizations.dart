@@ -25,8 +25,9 @@ class AppLocalizations {
   static AppLocalizations s(BuildContext context) => of(context);
 
   Future<void> load() async {
-    final jsonString = await rootBundle
-        .loadString('assets/translations/app_${locale.languageCode}.arb');
+    final jsonString = await rootBundle.loadString(
+      'assets/translations/app_${locale.languageCode}.arb',
+    );
     final Map<String, dynamic> parsed =
         json.decode(jsonString) as Map<String, dynamic>;
     _localizedValues = parsed;
@@ -48,6 +49,21 @@ class AppLocalizations {
   /// True when the active locale is Arabic (RTL). Used by widgets that need
   /// to mirror their own layout/alignment logic.
   bool get isArabic => locale.languageCode == 'ar';
+
+  String currencyName(String code) =>
+      _localizedValues['currency${code.toUpperCase()}']?.toString() ?? code;
+  String currencySymbol(String code) => isArabic
+      ? const {
+              'EGP': 'ج.م.',
+              'USD': '\$',
+              'EUR': '€',
+              'GBP': '£',
+              'SAR': 'ر.س.',
+              'AED': 'د.إ.',
+              'KWD': 'د.ك.',
+            }[code] ??
+            code
+      : code;
 }
 
 class _AppLocalizationsDelegate

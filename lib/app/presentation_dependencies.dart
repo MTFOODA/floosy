@@ -6,6 +6,7 @@ export '../core/localization/preferences_cubit.dart';
 export '../core/services/app_lock_cubit.dart';
 export '../features/auth/presentation/cubit/auth_cubit.dart';
 export '../features/dashboard/presentation/cubit/finance_cubit.dart';
+export '../features/dashboard/presentation/cubit/salary_plan_cubit.dart';
 export '../features/items/presentation/cubit/items_cubit.dart';
 export '../features/settings/presentation/cubit/cards_cubit.dart';
 export '../features/settings/presentation/cubit/profile_cubit.dart';

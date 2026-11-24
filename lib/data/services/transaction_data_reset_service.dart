@@ -93,8 +93,11 @@ class TransactionDataResetService {
 
     // 6. Local item usages (current month).
     final now = DateTime.now();
-    final usages = await moneyLocal.getItemUsages(userId,
-        year: now.year, month: now.month);
+    final usages = await moneyLocal.getItemUsages(
+      userId,
+      year: now.year,
+      month: now.month,
+    );
     for (final u in usages) {
       await moneyLocal.deleteItemUsage(u.id);
       counts.itemUsages++;
@@ -126,30 +129,10 @@ class TransactionDataResetService {
     }
 
     // 8. Remote cleanup (best-effort; log failures, do not abort).
-    await _remoteCleanup(userId, counts);
+    // Historical cloud records are retained; reset affects this device only.
 
     logInfo('DATA_RESET_DONE counts=$counts');
     return counts;
-  }
-
-  Future<void> _remoteCleanup(String userId, ResetCounts counts) async {
-    try {
-      final remoteTxns =
-          await transactionRemote.getTransactions(userId: userId, limit: 1000);
-      for (final t in remoteTxns) {
-        await transactionRemote.deleteTransaction(t.id);
-        counts.remoteTransactions++;
-      }
-    } catch (e) {
-      logError('DATA_RESET remote transactions failed', e);
-    }
-
-    try {
-      final sms = await smsRemote.getSmsMessages(userId: userId, limit: 1000);
-      counts.remoteSmsMessages = sms.length;
-    } catch (e) {
-      logError('DATA_RESET remote SMS failed', e);
-    }
   }
 }
 

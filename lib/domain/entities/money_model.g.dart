@@ -6,8 +6,8 @@ part of 'money_model.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$MonthlyIncomeImpl _$$MonthlyIncomeImplFromJson(Map<String, dynamic> json) =>
-    _$MonthlyIncomeImpl(
+_MonthlyIncome _$MonthlyIncomeFromJson(Map<String, dynamic> json) =>
+    _MonthlyIncome(
       id: json['id'] as String,
       userId: json['user_id'] as String,
       year: (json['year'] as num).toInt(),
@@ -20,7 +20,7 @@ _$MonthlyIncomeImpl _$$MonthlyIncomeImplFromJson(Map<String, dynamic> json) =>
       updatedAt: _dateTimeFromJson(json['updated_at']),
     );
 
-Map<String, dynamic> _$$MonthlyIncomeImplToJson(_$MonthlyIncomeImpl instance) =>
+Map<String, dynamic> _$MonthlyIncomeToJson(_MonthlyIncome instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,
@@ -34,9 +34,8 @@ Map<String, dynamic> _$$MonthlyIncomeImplToJson(_$MonthlyIncomeImpl instance) =>
       'updated_at': instance.updatedAt?.toIso8601String(),
     };
 
-_$UserBankAccountImpl _$$UserBankAccountImplFromJson(
-        Map<String, dynamic> json) =>
-    _$UserBankAccountImpl(
+_UserBankAccount _$UserBankAccountFromJson(Map<String, dynamic> json) =>
+    _UserBankAccount(
       id: json['id'] as String,
       userId: json['user_id'] as String,
       name: json['name'] as String,
@@ -50,8 +49,7 @@ _$UserBankAccountImpl _$$UserBankAccountImplFromJson(
       updatedAt: _dateTimeFromJson(json['updated_at']),
     );
 
-Map<String, dynamic> _$$UserBankAccountImplToJson(
-        _$UserBankAccountImpl instance) =>
+Map<String, dynamic> _$UserBankAccountToJson(_UserBankAccount instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,
@@ -65,9 +63,8 @@ Map<String, dynamic> _$$UserBankAccountImplToJson(
       'updated_at': instance.updatedAt?.toIso8601String(),
     };
 
-_$BankAccountMovementImpl _$$BankAccountMovementImplFromJson(
-        Map<String, dynamic> json) =>
-    _$BankAccountMovementImpl(
+_BankAccountMovement _$BankAccountMovementFromJson(Map<String, dynamic> json) =>
+    _BankAccountMovement(
       id: json['id'] as String,
       accountId: json['account_id'] as String,
       userId: json['user_id'] as String,
@@ -80,17 +77,17 @@ _$BankAccountMovementImpl _$$BankAccountMovementImplFromJson(
       createdAt: _dateTimeFromJson(json['created_at']),
     );
 
-Map<String, dynamic> _$$BankAccountMovementImplToJson(
-        _$BankAccountMovementImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'account_id': instance.accountId,
-      'user_id': instance.userId,
-      'type': instance.type,
-      'amount_minor': instance.amountMinor,
-      'description': instance.description,
-      'reference_type': instance.referenceType,
-      'reference_id': instance.referenceId,
-      'movement_date': instance.movementDate.toIso8601String(),
-      'created_at': instance.createdAt?.toIso8601String(),
-    };
+Map<String, dynamic> _$BankAccountMovementToJson(
+  _BankAccountMovement instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'account_id': instance.accountId,
+  'user_id': instance.userId,
+  'type': instance.type,
+  'amount_minor': instance.amountMinor,
+  'description': instance.description,
+  'reference_type': instance.referenceType,
+  'reference_id': instance.referenceId,
+  'movement_date': instance.movementDate.toIso8601String(),
+  'created_at': instance.createdAt?.toIso8601String(),
+};

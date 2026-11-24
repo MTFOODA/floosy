@@ -1,8 +1,10 @@
+import '../../../../domain/entities/bank_directory.dart';
 import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:floosy/features/dashboard/presentation/cubit/finance_cubit.dart';
+import 'package:floosy/features/dashboard/presentation/cubit/salary_plan_cubit.dart';
 import 'package:floosy/features/items/presentation/cubit/items_cubit.dart';
 import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
 import 'package:floosy/features/settings/presentation/cubit/profile_cubit.dart';
@@ -23,6 +25,8 @@ import '../../../../core/theme/item_appearance.dart';
 import '../../../../core/widgets/common/finance_panel.dart';
 import '../../../../routing/app_routes.dart';
 import '../widgets/card_selector_section.dart';
+import '../widgets/salary_cycle_card.dart';
+import '../widgets/salary_setup_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -34,6 +38,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   /// Item id currently being purchased Ã¢â‚¬â€ duplicate-tap protection (#27).
   String? _purchasingItemId;
+  bool _salaryPrompted = false;
 
   /// Toggles the eye visibility for the currently selected card ONLY.
   ///
@@ -68,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       l['wd4'],
       l['wd5'],
       l['wd6'],
-      l['wd7']
+      l['wd7'],
     ];
     final months = [
       l['mo1'],
@@ -82,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       l['mo9'],
       l['mo10'],
       l['mo11'],
-      l['mo12']
+      l['mo12'],
     ];
     return '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
   }
@@ -96,8 +101,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Card-specific money figures: when a detected card is selected, My
     // Balance, Pocket Cash and Deducted Money show THAT CARD's values only
     // (scoped by card_last4). No selection Ã¢â€ â€™ explicit zeros.
-    final summaryAsync =
-        context.watch<FinanceCubit>().state.map((data) => data.summary);
+    final summaryAsync = context.watch<FinanceCubit>().state.map(
+      (data) => data.summary,
+    );
+    final salaryState = context.watch<SalaryPlanCubit>().state;
     // Surface provider failures during development instead of silently
     // rendering zeros Ã¢â‚¬â€ zero must mean "calculated zero", not "error".
 
@@ -105,6 +112,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? context.watch<ItemsCubit>().state.map((data) => data.active)
         : null;
     final userName = profileAsync.value?.fullName ?? l['greetingFriend'];
+    if (!_salaryPrompted &&
+        salaryState.hasValue &&
+        !(salaryState.value?.isConfigured ?? false)) {
+      _salaryPrompted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showSalarySetupDialog(
+            context,
+            currentBalanceMinor: summaryAsync.value?.myBalanceMinor ?? 0,
+          );
+        }
+      });
+    }
     return Scaffold(
       backgroundColor: context.fc.background,
       body: SafeArea(
@@ -127,16 +147,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             await Future.wait([finance.reload(), items.reload()]);
           },
           child: SingleChildScrollView(
-            padding: FloosyDesign.horizontalPadding(context)
-                .copyWith(top: 16, bottom: 120),
+            padding: FloosyDesign.horizontalPadding(
+              context,
+            ).copyWith(top: 16, bottom: 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(userName, l),
                 const SizedBox(height: 20),
-                const DetectedCardsSection(compact: true),
+                const DetectedCardsSection(),
                 const SizedBox(height: 20),
                 _buildBalanceCard(summaryAsync, l),
+                const SizedBox(height: 20),
+                SalaryCycleCard(
+                  currentBalanceMinor: summaryAsync.value?.myBalanceMinor ?? 0,
+                ),
                 const SizedBox(height: 20),
                 _buildSummaryCards(summaryAsync, l),
                 const SizedBox(height: 24),
@@ -154,55 +179,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildHeader(String userName, AppLocalizations l) {
     return FinancePanel(
       colors: const [Color(0xFF0B4667), Color(0xFF137FA8)],
-      child: Row(children: [
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_getFormattedDate(l),
-              style: const TextStyle(fontSize: 11, color: Colors.white70)),
-          const SizedBox(height: 6),
-          Text(l[_greetingKey()],
-              style: const TextStyle(fontSize: 13, color: Colors.white70)),
-          const SizedBox(height: 4),
-          Text('$userName \u{1F44B}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white)),
-        ])),
-        IconButton(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getFormattedDate(l),
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l[_greetingKey()],
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$userName \u{1F44B}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 23,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
             tooltip: l['settings'],
             onPressed: () => context.push(AppRoutes.settings),
             style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: .12)),
-            icon:
-                const Icon(Icons.tune_rounded, color: Colors.white, size: 21)),
-        IconButton(
-            tooltip: 'Floosy',
+              backgroundColor: Colors.white.withValues(alpha: .12),
+            ),
+            icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 21),
+          ),
+          IconButton(
+            tooltip: l['appBrand'],
             onPressed: () => showAboutDialog(
-                context: context,
-                applicationName: 'Floosy',
-                applicationVersion: '1.0.0'),
-            icon: const Icon(Icons.info_outline_rounded,
-                color: Colors.white70, size: 21)),
-      ]),
+              context: context,
+              applicationName: l['appBrand'],
+              applicationVersion: '1.0.0',
+            ),
+            icon: const Icon(
+              Icons.info_outline_rounded,
+              color: Colors.white70,
+              size: 21,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBalanceCard(LoadState summaryAsync, AppLocalizations l) {
     final balance = summaryAsync.value?.myBalanceMinor ?? 0;
     // The selected card drives BOTH the eye state and the "+" limit.
-    final selectedCard =
-        context.watch<FinanceCubit>().state.map((data) => data.card).value;
+    final selectedCard = context
+        .watch<FinanceCubit>()
+        .state
+        .map((data) => data.card)
+        .value;
 
     // Per-card eye state, read from its OWN provider so toggling one card's
     // visibility never invalidates a money provider or another card.
     final isEyeVisible = selectedCard == null
         ? true
         : (context.watch<CardsCubit>().eyeVisible(selectedCard.id).value ??
-            selectedCard.appearance.eyeVisible);
+              selectedCard.appearance.eyeVisible);
 
     // The "+" button's availability is a BUSINESS RULE read from the money
     // layer rather than recomputed here:
@@ -211,7 +257,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     //   credit card with headroom           -> enabled, capped to that headroom
     //   debit card                          -> enabled (no Fixed Amount concept)
     //   no card selected                    -> disabled
-    final isPlusEnabled = context
+    final isPlusEnabled =
+        context
             .watch<FinanceCubit>()
             .state
             .map((data) => data.canAddBalance)
@@ -227,8 +274,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           Row(
             children: [
-              Text(l['myBalance'],
-                  style: const TextStyle(fontSize: 14, color: Colors.white70)),
+              Text(
+                l['myBalance'],
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
               const Spacer(),
               // "Add My Balance" Ã¢â‚¬â€ ICON ONLY (requirement #10). No text
               // label beside the icon; a Tooltip keeps it understandable
@@ -240,8 +289,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(10)),
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     child: Icon(
                       Icons.add_rounded,
                       color: isPlusEnabled ? Colors.white : Colors.white38,
@@ -256,22 +306,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? () => _toggleBalanceVisibility(selectedCard)
                     : null,
                 child: Icon(
-                    isEyeVisible
-                        ? Icons.visibility_rounded
-                        : Icons.visibility_off_rounded,
-                    color: Colors.white38,
-                    size: 20),
+                  isEyeVisible
+                      ? Icons.visibility_rounded
+                      : Icons.visibility_off_rounded,
+                  color: Colors.white38,
+                  size: 20,
+                ),
               ),
             ],
           ),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-                isEyeVisible
-                    ? formatMoney(balance)
-                    : '\u2022\u2022\u2022\u2022\u2022\u2022',
-                style: context.fc.financialValueLarge
-                    .copyWith(color: Colors.white)),
+              isEyeVisible
+                  ? formatMoney(
+                      balance,
+                      symbol: AppLocalizations.s(context).currencySymbol('EGP'),
+                    )
+                  : '\u2022\u2022\u2022\u2022\u2022\u2022',
+              style: context.fc.financialValueLarge.copyWith(
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -287,9 +343,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // for a credit card the entire Pocket Cash container is omitted (no empty
     // card, no 0 EGP placeholder, no disabled placeholder). Debit cards keep
     // the existing behaviour.
-    final selectedCard =
-        context.watch<FinanceCubit>().state.map((data) => data.card).value;
-    final showPocketCash = selectedCard == null ||
+    final selectedCard = context
+        .watch<FinanceCubit>()
+        .state
+        .map((data) => data.card)
+        .value;
+    final showPocketCash =
+        selectedCard == null ||
         (context
                 .watch<FinanceCubit>()
                 .state
@@ -301,21 +361,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         if (showPocketCash) ...[
           Expanded(
-              child: _SummaryCard(
-                  title: l['pocketCashLabel'],
-                  amount: formatMoney(pocketCash),
-                  subtitle: l['fromATM'],
-                  color: FloosyDesign.warmYellow,
-                  icon: Icons.account_balance_wallet_rounded)),
+            child: _SummaryCard(
+              title: l['pocketCashLabel'],
+              amount: formatMoney(
+                pocketCash,
+                symbol: AppLocalizations.s(context).currencySymbol('EGP'),
+              ),
+              subtitle: l['fromATM'],
+              color: FloosyDesign.warmYellow,
+              icon: Icons.account_balance_wallet_rounded,
+            ),
+          ),
           const SizedBox(width: 16),
         ],
         Expanded(
-            child: _SummaryCard(
-                title: l['deductedMoney'],
-                amount: formatMoney(deducted),
-                subtitle: l['thisMonth'],
-                color: FloosyDesign.coralRed,
-                icon: Icons.trending_down_rounded)),
+          child: _SummaryCard(
+            title: l['deductedMoney'],
+            amount: formatMoney(
+              deducted,
+              symbol: AppLocalizations.s(context).currencySymbol('EGP'),
+            ),
+            subtitle: l['thisMonth'],
+            color: FloosyDesign.coralRed,
+            icon: Icons.trending_down_rounded,
+          ),
+        ),
       ],
     );
   }
@@ -337,16 +407,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Capture immutable inputs while this widget is alive.
     final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    final selectedCard =
-        context.read<FinanceCubit>().state.map((data) => data.card).value;
+    final selectedCard = context
+        .read<FinanceCubit>()
+        .state
+        .map((data) => data.card)
+        .value;
     final selectedCardLast4 =
         selectedCard?.last4 ?? context.read<SelectedCardCubit>().state.last4;
     final selectedCardBankName = selectedCard?.bankName;
     if (selectedCardLast4 == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l['selectCardMessage'])),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l['selectCardMessage'])));
       }
       return;
     }
@@ -362,8 +435,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     //   credit card Ã¢â€ â€™ Fixed Amount Ã¢Ë†â€™ My Balance (0 when already at the max)
     //   debit card  Ã¢â€ â€™ null (no Fixed Amount)
     final maxAddable = await moneyRepo.getMaxAddableForCard(
-        userId, selectedCardLast4,
-        bankName: selectedCardBankName);
+      userId,
+      selectedCardLast4,
+      bankName: selectedCardBankName,
+    );
     final hasFixedAmount = maxAddable != null;
     final maxAddableMinor = maxAddable ?? 0;
 
@@ -379,41 +454,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             TextField(
               controller: amountController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               style: TextStyle(color: context.fc.textPrimary),
               decoration: InputDecoration(
-                  labelText: l['amountLabel'],
-                  labelStyle: TextStyle(color: context.fc.textSecondary),
-                  // Show the maximum addable amount as helper text for credit cards
-                  hintText: hasFixedAmount
-                      ? '${l['maxAddable']}: ${formatMoney(maxAddableMinor)}'
-                      : null),
+                labelText: l['amountLabel'],
+                labelStyle: TextStyle(color: context.fc.textSecondary),
+                // Show the maximum addable amount as helper text for credit cards
+                hintText: hasFixedAmount
+                    ? '${l['maxAddable']}: ${formatMoney(maxAddableMinor, symbol: AppLocalizations.s(context).currencySymbol('EGP'))}'
+                    : null,
+              ),
             ),
             const SizedBox(height: 12),
             ValueListenableBuilder<String>(
               valueListenable: currencyNotifier,
               builder: (context, currency, _) =>
                   DropdownButtonFormField<String>(
-                initialValue: currency,
-                dropdownColor: context.fc.primarySurface,
-                style: TextStyle(color: context.fc.textPrimary, fontSize: 14),
-                items: const ['EGP', 'USD', 'EUR', 'GBP', 'SAR', 'AED']
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => currencyNotifier.value = v ?? 'EGP',
-                decoration: InputDecoration(
-                    labelText: l['currencyLabel'],
-                    labelStyle: TextStyle(color: context.fc.textSecondary)),
-              ),
+                    initialValue: currency,
+                    dropdownColor: context.fc.primarySurface,
+                    style: TextStyle(
+                      color: context.fc.textPrimary,
+                      fontSize: 14,
+                    ),
+                    items: const ['EGP', 'USD', 'EUR', 'GBP', 'SAR', 'AED']
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(l.currencyName(c)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => currencyNotifier.value = v ?? 'EGP',
+                    decoration: InputDecoration(
+                      labelText: l['currencyLabel'],
+                      labelStyle: TextStyle(color: context.fc.textSecondary),
+                    ),
+                  ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: noteController,
               style: TextStyle(color: context.fc.textPrimary),
               decoration: InputDecoration(
-                  labelText: l['noteLabel'],
-                  labelStyle: TextStyle(color: context.fc.textSecondary)),
+                labelText: l['noteLabel'],
+                labelStyle: TextStyle(color: context.fc.textSecondary),
+              ),
             ),
           ],
         ),
@@ -434,8 +521,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final amount = double.tryParse(amountController.text.trim());
     if (amount == null || amount <= 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l['invalidAmount'])));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l['invalidAmount'])));
       }
       return;
     }
@@ -448,9 +536,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       amountMinor = maxAddableMinor;
       if (amountMinor <= 0) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l['maxAmountReached'])),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l['maxAmountReached'])));
         }
         return;
       }
@@ -471,13 +559,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       context.read<FinanceCubit>().reload();
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l['balanceAdded'])));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l['balanceAdded'])));
     } catch (e) {
       logError('Add My Balance failed', e);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l['failedToLoad'])));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l['failedToLoad'])));
       }
     }
   }
@@ -506,8 +596,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Requirement #10: verify a card is selected before doing anything.
     // Never silently charge another card.
-    final selectedCard =
-        context.read<FinanceCubit>().state.map((data) => data.card).value;
+    final selectedCard = context
+        .read<FinanceCubit>()
+        .state
+        .map((data) => data.card)
+        .value;
     if (selectedCard == null) {
       if (mounted) {
         await showDialog(
@@ -553,11 +646,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                formatMoney(item.priceMinor),
+                formatMoney(
+                  item.priceMinor,
+                  symbol: AppLocalizations.s(context).currencySymbol('EGP'),
+                ),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6F5BD3),
+                  color: Color(0xFF16BFB1),
                 ),
               ),
               const SizedBox(height: 20),
@@ -565,10 +661,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               Text(
                 l['payFrom'],
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B7280),
-                ),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 8),
               Text(l['pocketCashLabel']),
@@ -597,13 +690,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Requirement #17: re-validate the active card identity immediately before
     // completing the purchase, including the bank when last4 collides.
-    final activeCard =
-        context.read<FinanceCubit>().state.map((data) => data.card).value;
+    final activeCard = context
+        .read<FinanceCubit>()
+        .state
+        .map((data) => data.card)
+        .value;
     if (activeCard == null || activeCard.id != selectedCard.id) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l['selectCardMessage'])),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l['selectCardMessage'])));
       }
       return;
     }
@@ -611,8 +707,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final activeCardLast4 = activeCard.last4;
     setState(() => _purchasingItemId = item.id);
     logInfo(
-        'ITEM_PURCHASE_STARTED itemId=${item.id} cardLast4=$activeCardLast4 '
-        'amountMinor=${item.priceMinor}');
+      'ITEM_PURCHASE_STARTED itemId=${item.id} cardLast4=$activeCardLast4 '
+      'amountMinor=${item.priceMinor}',
+    );
     try {
       final repo = context.read<FinanceCubit>();
       await repo.purchaseItemWithCash(
@@ -622,19 +719,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         bankName: activeCard.bankName,
       );
       logInfo(
-          'ITEM_PURCHASE_SUCCESS itemId=${item.id} cardLast4=$activeCardLast4');
+        'ITEM_PURCHASE_SUCCESS itemId=${item.id} cardLast4=$activeCardLast4',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '${item.nameAr ?? item.name} Ã¢â‚¬â€ ${formatMoney(item.priceMinor)}'),
+              '${l.isArabic ? item.nameAr ?? item.name : item.name} — ${formatMoney(item.priceMinor, symbol: AppLocalizations.s(context).currencySymbol('EGP'))}',
+            ),
             duration: const Duration(seconds: 1),
           ),
         );
       }
     } on InsufficientPocketCashException catch (e) {
-      logInfo('ITEM_PURCHASE_FAILED insufficient cash itemId=${item.id} '
-          'required=${e.requiredMinor} available=${e.availableMinor}');
+      logInfo(
+        'ITEM_PURCHASE_FAILED insufficient cash itemId=${item.id} '
+        'required=${e.requiredMinor} available=${e.availableMinor}',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -669,35 +770,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 logInfo('NAV_TARGET_ROUTE ${AppRoutes.items}');
                 context.push(AppRoutes.items);
               },
-              child: Text(l['seeAll'],
-                  style: const TextStyle(
-                      fontSize: 14,
-                      color: FloosyDesign.brightPurple,
-                      fontWeight: FontWeight.w500)),
+              child: Text(
+                l['seeAll'],
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: FloosyDesign.brightPurple,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         if (itemsAsync?.isLoading == true)
           const Padding(
-              padding: EdgeInsets.all(32), child: CircularProgressIndicator())
+            padding: EdgeInsets.all(32),
+            child: CircularProgressIndicator(),
+          )
         else if (items.isEmpty)
           Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(l['noItems'],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: context.fc.textMuted)))
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              l['noItems'],
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.fc.textMuted),
+            ),
+          )
         else
-          ...items.take(4).map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                // MAIN/HOME PAGE tap Ã¢â€ â€™ Item Purchase (#21-#23). This callback is
-                // ONLY attached here Ã¢â‚¬â€ the Items management screen never charges.
-                child: _BudgetItemCard(
-                  item: item,
-                  onTap: () => _purchaseItem(item),
-                  purchasing: _purchasingItemId == item.id,
+          ...items
+              .take(4)
+              .map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  // MAIN/HOME PAGE tap Ã¢â€ â€™ Item Purchase (#21-#23). This callback is
+                  // ONLY attached here Ã¢â‚¬â€ the Items management screen never charges.
+                  child: _BudgetItemCard(
+                    item: item,
+                    onTap: () => _purchaseItem(item),
+                    purchasing: _purchasingItemId == item.id,
+                  ),
                 ),
-              )),
+              ),
       ],
     );
   }
@@ -729,45 +842,61 @@ class _SummaryCard extends StatelessWidget {
   final String title, amount, subtitle;
   final Color color;
   final IconData icon;
-  const _SummaryCard(
-      {required this.title,
-      required this.amount,
-      required this.subtitle,
-      required this.color,
-      required this.icon});
+  const _SummaryCard({
+    required this.title,
+    required this.amount,
+    required this.subtitle,
+    required this.color,
+    required this.icon,
+  });
   @override
   Widget build(BuildContext context) => FinancePanel(
-        height: 124,
-        padding: const EdgeInsets.all(16),
-        colors: [Color.lerp(color, Colors.black, .22)!, color],
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
+    height: 124,
+    padding: const EdgeInsets.all(16),
+    colors: [Color.lerp(color, Colors.black, .22)!, color],
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
             Icon(icon, color: Colors.white, size: 19),
             const SizedBox(width: 7),
             Expanded(
-                child: Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white)))
-          ]),
-          const Spacer(),
-          FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(amount,
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white))),
-          const SizedBox(height: 7),
-          Text(subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: Colors.white70)),
-        ]),
-      );
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            amount,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, color: Colors.white70),
+        ),
+      ],
+    ),
+  );
 }
 
 class _BudgetItemCard extends StatelessWidget {
@@ -785,7 +914,7 @@ class _BudgetItemCard extends StatelessWidget {
     final l = AppLocalizations.s(context);
     final counts =
         context.watch<ItemsCubit>().state.map((data) => data.usage).value ??
-            const <String, int>{};
+        const <String, int>{};
     final count = counts[item.id] ?? 0;
     final total = counts.values.fold<int>(0, (sum, value) => sum + value);
     final progress = total == 0 ? 0.0 : count / total;
@@ -809,20 +938,29 @@ class _BudgetItemCard extends StatelessWidget {
                   ItemAvatar(item: item, size: 44),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(item.nameAr ?? item.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: context.fc.textPrimary)),
+                    child: Text(
+                      item.nameAr ?? item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: context.fc.textPrimary,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  Text(formatMoney(item.priceMinor),
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: context.fc.textPrimary)),
+                  Text(
+                    formatMoney(
+                      item.priceMinor,
+                      symbol: AppLocalizations.s(context).currencySymbol('EGP'),
+                    ),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: context.fc.textPrimary,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -832,8 +970,9 @@ class _BudgetItemCard extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 builder: (context, value, _) {
                   return ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(FloosyDesign.radiusPill),
+                    borderRadius: BorderRadius.circular(
+                      FloosyDesign.radiusPill,
+                    ),
                     child: LinearProgressIndicator(
                       value: value,
                       backgroundColor: context.fc.elevatedSurface,
@@ -852,8 +991,9 @@ class _BudgetItemCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                  l.t('itemUsageShare', {'count': '$count', 'total': '$total'}),
-                  style: TextStyle(fontSize: 11, color: context.fc.textMuted)),
+                l.t('itemUsageShare', {'count': '$count', 'total': '$total'}),
+                style: TextStyle(fontSize: 11, color: context.fc.textMuted),
+              ),
             ],
           ),
         ),
@@ -896,11 +1036,7 @@ class _CardPreview extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.credit_card,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.credit_card, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -908,7 +1044,12 @@ class _CardPreview extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  card.bankName ?? 'Bank',
+                  card.bankName == null
+                      ? AppLocalizations.s(context)['bankUnknown']
+                      : BankCatalog.displayName(
+                          card.bankName,
+                          arabic: AppLocalizations.s(context).isArabic,
+                        ),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -919,7 +1060,7 @@ class _CardPreview extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢ ${card.last4}',
+                  '•••• ${card.last4}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,

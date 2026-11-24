@@ -25,6 +25,8 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
   late int _presetIndex;
   late int? _colorA;
   late int? _colorB;
+  bool _saving = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -38,48 +40,102 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
     if (_colorA != null && _colorB != null) {
       return [Color(_colorA!), Color(_colorB!)];
     }
-    return CardPresets
-        .presets[_presetIndex.clamp(0, CardPresets.presets.length - 1)];
+    return CardPresets.presets[_presetIndex.clamp(
+      0,
+      CardPresets.presets.length - 1,
+    )];
   }
 
   Future<void> _save() async {
-    final appearance = CardAppearance(
-      presetIndex: _presetIndex,
-      colorA: _colorA,
-      colorB: _colorB,
-    );
-    await widget.repository
-        .updateAppearance(widget.card.userId, widget.card.id, appearance);
-    if (mounted) Navigator.of(context).pop(true);
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      await widget.repository.updateAppearance(
+        widget.card.userId,
+        widget.card.id,
+        CardAppearance(
+          presetIndex: _presetIndex,
+          colorA: _colorA,
+          colorB: _colorB,
+        ),
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _saveError = AppLocalizations.s(context)['saveFailed'];
+        });
+      }
+    }
   }
 
   Future<void> _pickColor({required bool isFirst}) async {
-    const palette = [
-      Color(0xFF6F5BD3),
-      Color(0xFF0EA5E9),
-      Color(0xFFF05B9A),
-      Color(0xFFFFB84D),
-      Color(0xFF10B981),
-      Color(0xFF1E293B),
-      Color(0xFFEC4899),
-      Color(0xFF4F46E5),
-      Color(0xFF8B5CF6),
-      Color(0xFF55AFFF),
-      Color(0xFF34D399),
-      Color(0xFFF59E1A),
-    ];
-    final current = isFirst ? _colorA : _colorB;
-    final idx = current == null
-        ? -1
-        : palette.indexWhere((c) => c.toARGB32() == current);
-    final next = palette[(idx + 1) % palette.length].toARGB32();
+    final l = AppLocalizations.s(context);
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l[isFirst ? 'cardColor1' : 'cardColor2']),
+        content: SizedBox(
+          width: 320,
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final color in CardPresets.palette)
+                  Semantics(
+                    label:
+                        '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+                    button: true,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(dialogContext, color),
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
+                        ),
+                        child:
+                            (isFirst
+                                    ? _previewColors.first
+                                    : _previewColors.last) ==
+                                color
+                            ? Icon(
+                                Icons.check,
+                                color: color.computeLuminance() > .45
+                                    ? Colors.black
+                                    : Colors.white,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l['cancel']),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final previous = _previewColors;
     setState(() {
-      if (isFirst) {
-        _colorA = next;
-      } else {
-        _colorB = next;
-        _colorA ??= CardPresets.presets[_presetIndex].first.toARGB32();
-      }
+      _colorA = (isFirst ? picked : previous.first).toARGB32();
+      _colorB = (isFirst ? previous.last : picked).toARGB32();
     });
   }
 
@@ -87,14 +143,13 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
     return AnimatedPadding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height -
+          maxHeight:
+              MediaQuery.sizeOf(context).height -
               MediaQuery.viewInsetsOf(context).bottom,
         ),
         decoration: BoxDecoration(
@@ -104,8 +159,9 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
         child: SafeArea(
           top: false,
           child: SingleChildScrollView(
-            padding: FloosyDesign.horizontalPadding(context)
-                .copyWith(top: 18, bottom: 12),
+            padding: FloosyDesign.horizontalPadding(
+              context,
+            ).copyWith(top: 18, bottom: 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,9 +184,10 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
                 DetectedBankCard(
                   card: widget.card.copyWith(
                     appearance: CardAppearance(
-                        presetIndex: _presetIndex,
-                        colorA: _colorA,
-                        colorB: _colorB),
+                      presetIndex: _presetIndex,
+                      colorA: _colorA,
+                      colorB: _colorB,
+                    ),
                   ),
                   onEdit: () {},
                 ),
@@ -168,8 +225,11 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
                             ),
                           ),
                           child: selected
-                              ? const Icon(Icons.check_rounded,
-                                  color: Colors.white, size: 22)
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                )
                               : null,
                         ),
                       );
@@ -181,7 +241,7 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
                   children: [
                     Expanded(
                       child: _ColorSwatch(
-                        label: 'Color 1',
+                        label: l['cardColor1'],
                         color: _previewColors[0],
                         onTap: () => _pickColor(isFirst: true),
                       ),
@@ -189,32 +249,38 @@ class _CardCustomizationSheetState extends State<CardCustomizationSheet> {
                     const SizedBox(width: 14),
                     Expanded(
                       child: _ColorSwatch(
-                        label: 'Color 2',
+                        label: l['cardColor2'],
                         color: _previewColors[1],
                         onTap: () => _pickColor(isFirst: false),
                       ),
                     ),
                   ],
                 ),
+                if (_saveError != null)
+                  Text(_saveError!, style: const TextStyle(color: Colors.red)),
                 const SizedBox(height: 24),
                 GestureDetector(
-                  onTap: _save,
+                  onTap: _saving ? null : _save,
                   child: Container(
                     height: 54,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: FloosyDesign.purpleGradient,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: glowShadow(FloosyDesign.primaryPurple,
-                          radius: 16, opacity: 0.35),
+                      boxShadow: glowShadow(
+                        FloosyDesign.primaryPurple,
+                        radius: 16,
+                        opacity: 0.35,
+                      ),
                     ),
                     child: Center(
                       child: Text(
-                        l['saveChanges'],
+                        l[_saving ? 'saving' : 'saveChanges'],
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600),
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -232,8 +298,11 @@ class _ColorSwatch extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _ColorSwatch(
-      {required this.label, required this.color, required this.onTap});
+  const _ColorSwatch({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -132,7 +132,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 style: TextStyle(fontSize: 14, color: context.fc.textPrimary),
                 decoration: _inputDecoration(context),
                 items: _currencies
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(l.currencyName(c))))
                     .toList(),
                 onChanged: (v) => setState(() => _currency = v ?? _currency),
               ),

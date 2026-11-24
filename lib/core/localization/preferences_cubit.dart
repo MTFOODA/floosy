@@ -56,7 +56,9 @@ class ThemeModeCubit extends Cubit<ThemeMode> {
   Future<void> setThemeMode(ThemeMode mode) async {
     emit(mode);
     await _preferences.write(
-        PrefsKeys.themeMode, mode == ThemeMode.dark ? 'dark' : 'light');
+      PrefsKeys.themeMode,
+      mode == ThemeMode.dark ? 'dark' : 'light',
+    );
   }
 }
 
@@ -80,27 +82,42 @@ class SelectedCardCubit extends Cubit<CardSelection> {
   final AppPreferencesRepository _preferences;
   late final Future<void> ready;
   Future<void> _save = Future.value();
+  int _accountGeneration = 0;
   SelectedCardCubit(this._preferences) : super(const CardSelection()) {
     ready = _load();
   }
   String? get bankName => state.bankName;
+  void resetForAccount() {
+    _accountGeneration++;
+    emit(const CardSelection());
+  }
+
+  Future<void> reload() => _load();
   Future<void> _load() async {
+    final generation = _accountGeneration;
     final bank = await _preferences.read(PrefsKeys.selectedCardBankName);
     final last4 = await _preferences.read(PrefsKeys.selectedCardLast4);
-    if (!isClosed) emit(CardSelection(last4: last4, bankName: bank));
+    if (!isClosed && generation == _accountGeneration) {
+      emit(CardSelection(last4: last4, bankName: bank));
+    }
   }
 
   Future<void> setSelectedCard(String? last4, {String? bankName}) async {
+    final generation = _accountGeneration;
     await ready;
-    if (isClosed) return;
+    if (isClosed || generation != _accountGeneration) return;
     emit(
-        CardSelection(last4: last4, bankName: last4 == null ? null : bankName));
+      CardSelection(last4: last4, bankName: last4 == null ? null : bankName),
+    );
     _save = _save.catchError((Object _) {}).then((_) async {
+      if (generation != _accountGeneration) return;
       if (last4 == null) {
         await _preferences.remove(PrefsKeys.selectedCardLast4);
+        if (generation != _accountGeneration) return;
         await _preferences.remove(PrefsKeys.selectedCardBankName);
       } else {
         await _preferences.write(PrefsKeys.selectedCardLast4, last4);
+        if (generation != _accountGeneration) return;
         if (bankName == null || bankName.isEmpty) {
           await _preferences.remove(PrefsKeys.selectedCardBankName);
         } else {
@@ -139,8 +156,9 @@ class SelectedCardCubit extends Cubit<CardSelection> {
       await setSelectedCard(cards.first.last4, bankName: cards.first.bankName);
     } else if (matches.length > 1) {
       final bank = normalizeBankIdentity(state.bankName);
-      final qualified = matches.where((card) =>
-          bank != null && normalizeBankIdentity(card.bankName) == bank);
+      final qualified = matches.where(
+        (card) => bank != null && normalizeBankIdentity(card.bankName) == bank,
+      );
       if (qualified.length != 1) {
         // Preserve the unresolved legacy identity until the user chooses a bank.
         emit(CardSelection(last4: state.last4, requiresChoice: true));

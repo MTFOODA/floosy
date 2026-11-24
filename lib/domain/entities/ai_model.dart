@@ -11,7 +11,7 @@ DateTime? _dateTimeFromJson(dynamic value) =>
 enum AIMessageRole { user, assistant, tool, system }
 
 @freezed
-class AIConversation with _$AIConversation {
+abstract class AIConversation with _$AIConversation {
   const factory AIConversation({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -27,7 +27,7 @@ class AIConversation with _$AIConversation {
 }
 
 @freezed
-class AIMessage with _$AIMessage {
+abstract class AIMessage with _$AIMessage {
   const factory AIMessage({
     required String id,
     @JsonKey(name: 'conversation_id') required String conversationId,
@@ -50,11 +50,11 @@ enum AIActionStatus {
   confirmed,
   rejected,
   completed,
-  failed
+  failed,
 }
 
 @freezed
-class AIAction with _$AIAction {
+abstract class AIAction with _$AIAction {
   const factory AIAction({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -80,7 +80,7 @@ enum SyncOperation { insert, update, delete }
 enum SyncStatus { pending, processing, completed, failed }
 
 @freezed
-class SyncQueueItem with _$SyncQueueItem {
+abstract class SyncQueueItem with _$SyncQueueItem {
   const factory SyncQueueItem({
     required String id,
     @JsonKey(name: 'user_id') required String userId,

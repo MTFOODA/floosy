@@ -213,14 +213,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       _SummaryCard(
           title: l['totalSpending'],
           symbol: '💸',
-          value: formatMoney(totalSpending),
+          value: formatMoney(totalSpending, symbol: AppLocalizations.s(context).currencySymbol('EGP')),
           subtitle: totalSubtitle,
           subtitleColor:
               totalSubtitle.startsWith('-') ? FloosyDesign.positive : null),
       _SummaryCard(
           title: l['largestExpense'],
           symbol: '🏠',
-          value: largest != null ? formatMoney(largest.amountMinor) : '0 EGP',
+          value: largest != null ? formatMoney(largest.amountMinor, symbol: AppLocalizations.s(context).currencySymbol('EGP')) : "0 ${AppLocalizations.s(context).currencySymbol('EGP')}",
           subtitle: largestSubtitle),
       _SummaryCard(
           title: l['mostUsed'],
@@ -382,7 +382,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       for (var i = 5; i < sortedTypes.length; i++) {
         rest += (typeTotals[sortedTypes[i]] ?? 0) / grandTotal;
       }
-      categories.add(_CategoryData('Other', rest, donutColors[5]));
+      categories.add(_CategoryData(l['other'], rest, donutColors[5]));
     }
 
     return Container(

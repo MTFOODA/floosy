@@ -20,15 +20,12 @@ void showLanguageDialog(BuildContext context, AppLocalizations l) {
             context.read<LocaleCubit>().setLocale(Locale(code ?? 'en'));
             Navigator.pop(dialogContext);
           },
-          child: const Column(
+          child: Column(
             children: [
-              RadioListTile<String>(
-                value: 'ar',
-                title: Text('العربية'),
-              ),
+              const RadioListTile<String>(value: 'ar', title: Text('العربية')),
               RadioListTile<String>(
                 value: 'en',
-                title: Text('English'),
+                title: Text(l['englishLanguage']),
               ),
             ],
           ),

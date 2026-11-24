@@ -430,7 +430,7 @@ class _ItemManagementCard extends StatelessWidget {
                               ? null
                               : TextDecoration.lineThrough)),
                   const SizedBox(height: 4),
-                  Text(formatMoney(item.priceMinor),
+                  Text(formatMoney(item.priceMinor, symbol: AppLocalizations.s(context).currencySymbol('EGP')),
                       style: context.fc.bodyTextSmall)
                 ])),
             IconButton(

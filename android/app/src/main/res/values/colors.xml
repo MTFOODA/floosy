@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Floosy brand background color — matches the Flutter splash scaffold. -->
-    <color name="floosy_background">#FFFAFAFA</color>
+    <color name="floosy_background">#FFFFFFFF</color>
+	<color name="ic_launcher_background">#FFFFFF</color>
 </resources>

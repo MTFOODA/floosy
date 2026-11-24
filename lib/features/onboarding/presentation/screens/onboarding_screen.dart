@@ -1,3 +1,5 @@
+import '../../../../core/localization/app_localizations.dart';
+import '../../../../domain/entities/bank_directory.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../routing/app_routes.dart';
@@ -10,6 +12,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  AppLocalizations get _l => AppLocalizations.s(context);
   int _currentStep = 0;
   late PageController _pageController;
   String? _selectedCurrency = 'EGP';
@@ -103,7 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _previousStep,
-                        child: const Text('Back'),
+                        child: Text(_l['previousStep']),
                       ),
                     ),
                   if (_currentStep > 0) const SizedBox(width: 12),
@@ -111,7 +114,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: ElevatedButton(
                       onPressed: _nextStep,
                       child: Text(
-                        _currentStep == 4 ? 'Start Using Floosy' : 'Next',
+                        _currentStep == 4
+                            ? _l['onboardingStart']
+                            : _l['nextStep'],
                       ),
                     ),
                   ),
@@ -132,43 +137,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           const SizedBox(height: 40),
           Text(
-            'Welcome to Floosy',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            _l['onboardingWelcome'],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Text(
-            'Your personal finance assistant for managing expenses, tracking spending, and achieving your financial goals.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey,
-                  height: 1.6,
-                ),
+            _l['onboardingIntro'],
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.grey, height: 1.6),
           ),
           const SizedBox(height: 40),
           _buildFeatureItem(
             '💰',
-            'Track All Transactions',
-            'Automatically capture bank and cash transactions',
+            _l['onboardingTrack'],
+            _l['onboardingTrackHint'],
           ),
           const SizedBox(height: 24),
           _buildFeatureItem(
             '📊',
-            'Smart Analytics',
-            'Get insights into your spending patterns',
+            _l['onboardingAnalytics'],
+            _l['onboardingAnalyticsHint'],
           ),
           const SizedBox(height: 24),
           _buildFeatureItem(
             '🎯',
-            'Set & Achieve Goals',
-            'Create budgets and saving goals',
+            _l['onboardingGoals'],
+            _l['onboardingGoalsHint'],
           ),
           const SizedBox(height: 24),
-          _buildFeatureItem(
-            '🤖',
-            'AI Assistant',
-            'Get personalized financial recommendations',
-          ),
+          _buildFeatureItem('🤖', _l['onboardingAI'], _l['onboardingAIHint']),
         ],
       ),
     );
@@ -186,16 +186,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
                 description,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
             ],
           ),
@@ -212,17 +212,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           const SizedBox(height: 24),
           Text(
-            'Select Your Currency',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            _l['selectCurrency'],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose the primary currency for your transactions',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
-                ),
+            _l['currencyHint'],
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 24),
           ..._currencies.map((currency) {
@@ -253,33 +253,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             : Colors.grey,
                       ),
                       const SizedBox(width: 12),
-                      Column(
+                      Expanded(child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            currency['code']!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            _l.currencyName(currency['code']!),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            currency['name']!,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey,
-                                    ),
+                            _l.currencySymbol(currency['code']!),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                           ),
                         ],
-                      ),
+                      )),
                     ],
                   ),
                 ),
               ),
             );
-          })
+          }),
         ],
       ),
     );
@@ -293,17 +288,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           const SizedBox(height: 24),
           Text(
-            'Select Your Bank',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            _l['selectBank'],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose your primary bank for transaction tracking',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
-                ),
+            _l['bankHint'],
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 24),
           ..._banks.map((bank) {
@@ -338,22 +333,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              bank['name']!,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              BankCatalog.displayName(
+                                bank['code'],
+                                arabic: _l.isArabic,
+                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'Code: ${bank['code']}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Colors.grey,
-                                  ),
+                              '${_l['bankCode']}: ${bank['code']}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: Colors.grey),
                             ),
                           ],
                         ),
@@ -363,7 +353,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             );
-          })
+          }),
         ],
       ),
     );
@@ -377,23 +367,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           const SizedBox(height: 24),
           Text(
-            'Enable Permissions',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            _l['enablePermissions'],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Floosy needs certain permissions to work effectively',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
-                ),
+            _l['permissionsIntro'],
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 24),
           _buildPermissionCard(
             '📱',
-            'SMS Access',
-            'Read transaction SMS from your bank',
+            _l['smsAccess'],
+            _l['smsAccessHint'],
             _smsPermissionGranted,
             () async {
               // TODO: Request SMS permission
@@ -403,8 +393,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
           _buildPermissionCard(
             '🔔',
-            'Notifications',
-            'Get alerts about your spending',
+            _l['notifications'],
+            _l['notificationsHint'],
             _notificationPermissionGranted,
             () async {
               // TODO: Request notification permission
@@ -440,33 +430,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
           if (isGranted)
-            Icon(
-              Icons.check_circle,
-              color: Theme.of(context).primaryColor,
-            )
+            Icon(Icons.check_circle, color: Theme.of(context).primaryColor)
           else
             ElevatedButton(
               onPressed: onRequest,
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
               ),
-              child: const Text('Grant'),
+              child: Text(_l['grantPermission']),
             ),
         ],
       ),
@@ -481,25 +470,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           const SizedBox(height: 24),
           Text(
-            'All Set! 🎉',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            _l['allSet'],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          _buildSummaryItem('Currency', _selectedCurrency ?? 'Not selected'),
-          const SizedBox(height: 16),
           _buildSummaryItem(
-            'Bank',
-            _banks.firstWhere((b) => b['id'] == _selectedBank,
-                orElse: () => {'name': 'Not selected'})['name']!,
+            _l['currency'],
+            _selectedCurrency == null
+                ? _l['notSelected']
+                : _l.currencyName(_selectedCurrency!),
           ),
           const SizedBox(height: 16),
           _buildSummaryItem(
-              'SMS Tracking', _smsPermissionGranted ? 'Enabled' : 'Disabled'),
+            _l['bankLabel'],
+            _selectedBank == null
+                ? _l['notSelected']
+                : BankCatalog.displayName(
+                    _banks.firstWhere((b) => b['id'] == _selectedBank)['code'],
+                    arabic: _l.isArabic,
+                  ),
+          ),
           const SizedBox(height: 16),
-          _buildSummaryItem('Notifications',
-              _notificationPermissionGranted ? 'Enabled' : 'Disabled'),
+          _buildSummaryItem(
+            _l['smsTracking'],
+            _smsPermissionGranted ? _l['enabledLabel'] : _l['disabledLabel'],
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryItem(
+            _l['notifications'],
+            _notificationPermissionGranted
+                ? _l['enabledLabel']
+                : _l['disabledLabel'],
+          ),
           const SizedBox(height: 40),
           Container(
             padding: const EdgeInsets.all(16),
@@ -514,7 +518,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'You can update these settings anytime in the Settings screen',
+                    _l['onboardingSettingsHint'],
                     style: TextStyle(color: Colors.green.shade700),
                   ),
                 ),
@@ -532,15 +536,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );

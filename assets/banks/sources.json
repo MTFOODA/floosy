@@ -1,0 +1,267 @@
+{
+  "CIB": {
+    "website": "https://cibeg.com",
+    "source": "https://www.google.com/s2/favicons?domain=cibeg.com&sz=128",
+    "width": 128,
+    "asset": "assets/banks/cib.png"
+  },
+  "NBE": {
+    "website": "https://nbe.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=nbe.com.eg&sz=128",
+    "width": 91,
+    "asset": "assets/banks/nbe.png"
+  },
+  "MISR": {
+    "website": "https://banquemisr.com",
+    "source": "https://www.google.com/s2/favicons?domain=banquemisr.com&sz=128",
+    "width": 16,
+    "asset": "assets/banks/misr.png"
+  },
+  "QNB": {
+    "website": "https://qnb.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=qnb.com.eg&sz=128",
+    "width": 16,
+    "asset": "assets/banks/qnb.png"
+  },
+  "ALEX": {
+    "website": "https://alexbank.com",
+    "source": "https://www.google.com/s2/favicons?domain=alexbank.com&sz=128",
+    "width": 96,
+    "asset": "assets/banks/alex.png"
+  },
+  "HSBC": {
+    "website": "https://hsbc.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=hsbc.com.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/hsbc.png"
+  },
+  "ADIB": {
+    "website": "https://adib.eg",
+    "source": "https://www.google.com/s2/favicons?domain=adib.eg&sz=128",
+    "width": 30,
+    "asset": "assets/banks/adib.png"
+  },
+  "ENBD": {
+    "website": "https://emiratesnbd.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=emiratesnbd.com.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/enbd.png"
+  },
+  "FAB": {
+    "website": "https://fabmisr.com.eg",
+    "source": "https://www.fabmisr.com.eg/-/media/Project/FAB2/Fab2/data/media/img/FAB-favicon.ico",
+    "width": 16,
+    "asset": "assets/banks/fab.png"
+  },
+  "AAIB": {
+    "website": "https://aaib.com",
+    "source": "https://aaib.com/favicon.ico",
+    "width": 69,
+    "asset": "assets/banks/aaib.png"
+  },
+  "FAISAL": {
+    "website": "https://faisalbank.com.eg",
+    "source": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/45/b1/73/45b17381-89d9-a6ea-05f5-563151c19285/AppIcon-1x_U007emarketing-0-8-0-85-220-0.png/512x512bb.jpg",
+    "width": 256,
+    "asset": "assets/banks/faisal.png",
+    "publisher": "FAISAL ISLAMIC BANK OF EGYPT (S.A.E.)",
+    "app_url": "https://apps.apple.com/eg/app/fibe-online/id6451188523?uo=4"
+  },
+  "BDC": {
+    "website": "https://bdc.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=bdc.com.eg&sz=128",
+    "width": 43,
+    "asset": "assets/banks/bdc.png"
+  },
+  "CAE": {
+    "website": "https://ca-egypt.com",
+    "source": "https://www.google.com/s2/favicons?domain=ca-egypt.com&sz=128",
+    "width": 128,
+    "asset": "assets/banks/cae.png"
+  },
+  "ADCB": {
+    "website": "https://adcb.com.eg",
+    "source": "https://www.adcb.com.eg/wp-content/uploads/2020/08/cropped-logo-32x32.png",
+    "width": 32,
+    "asset": "assets/banks/adcb.png"
+  },
+  "ABK": {
+    "website": "https://abkegypt.com",
+    "source": "https://www.google.com/s2/favicons?domain=abkegypt.com&sz=128",
+    "width": 48,
+    "asset": "assets/banks/abk.png"
+  },
+  "NBK": {
+    "website": "https://nbk.com",
+    "source": "https://www.google.com/s2/favicons?domain=nbk.com&sz=128",
+    "width": 16,
+    "asset": "assets/banks/nbk.png"
+  },
+  "KFH": {
+    "website": "https://eg.kfh.com",
+    "source": "https://www.eg.kfh.com/wp-content/uploads/2025/01/cropped-kfh-favicon-192x192.png",
+    "width": 192,
+    "asset": "assets/banks/kfh.png"
+  },
+  "EGBANK": {
+    "website": "https://eg-bank.com",
+    "source": "https://www.google.com/s2/favicons?domain=eg-bank.com&sz=128",
+    "width": 32,
+    "asset": "assets/banks/egbank.png"
+  },
+  "EBANK": {
+    "website": "https://ebank.com.eg",
+    "source": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/10/14/7e/10147ee1-8231-2eac-1a2f-27f6823f5d02/AppIcon-0-0-1x_U007emarketing-0-11-0-0-85-220.png/512x512bb.jpg",
+    "width": 256,
+    "asset": "assets/banks/ebank.png",
+    "publisher": "Export Development Bank of Egypt",
+    "app_url": "https://apps.apple.com/eg/app/ebank-mobile-banking/id1474121936?uo=4"
+  },
+  "HDB": {
+    "website": "https://hdb-egy.com",
+    "source": "https://www.google.com/s2/favicons?domain=www.hdb-egy.com&sz=128",
+    "width": 43,
+    "asset": "assets/banks/hdb.png"
+  },
+  "SAIB": {
+    "website": "https://saib.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=saib.com.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/saib.png"
+  },
+  "SCB": {
+    "website": "https://scbank.com.eg",
+    "source": "https://scbank.com.eg/images/favicon.png",
+    "width": 64,
+    "asset": "assets/banks/scb.png"
+  },
+  "ABC": {
+    "website": "https://bank-abc.com",
+    "source": "https://www.google.com/s2/favicons?domain=bank-abc.com&sz=128",
+    "width": 48,
+    "asset": "assets/banks/abc.png"
+  },
+  "ARAB": {
+    "website": "https://arabbank.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=arabbank.com.eg&sz=128",
+    "width": 48,
+    "asset": "assets/banks/arab.png"
+  },
+  "AIB": {
+    "website": "https://aib.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=aib.com.eg&sz=128",
+    "width": 48,
+    "asset": "assets/banks/aib.png"
+  },
+  "NXT": {
+    "website": "https://banknxteg.com",
+    "source": "https://www.google.com/s2/favicons?domain=banknxteg.com&sz=128",
+    "width": 16,
+    "asset": "assets/banks/nxt.png"
+  },
+  "MIDBANK": {
+    "website": "https://midbank.com.eg",
+    "source": "https://www.logodalil.com.eg/images/Banks_logos/midbank.jpg",
+    "width": 240,
+    "asset": "assets/banks/midbank.png",
+    "attribution": "LogoDaliL Egypt (bank directory)"
+  },
+  "EALB": {
+    "website": "https://eal-bank.com",
+    "source": "https://www.eal-bank.com/VI/images/logo-icon.png",
+    "width": 283,
+    "asset": "assets/banks/ealb.png"
+  },
+  "ABE": {
+    "website": "https://abe.com.eg",
+    "source": "https://abe.com.eg/assets/img/logo.png",
+    "width": 168,
+    "asset": "assets/banks/abe.png"
+  },
+  "IDB": {
+    "website": "https://idb.com.eg",
+    "source": "https://idb.com.eg/media/1yspvaw2/favicon.ico",
+    "width": 32,
+    "asset": "assets/banks/idb.png"
+  },
+  "UB": {
+    "website": "https://theubeg.com",
+    "source": "https://www.theubeg.com/favicon.ico",
+    "width": 16,
+    "asset": "assets/banks/ub.png"
+  },
+  "ALBARAKA": {
+    "website": "https://albaraka.com.eg",
+    "source": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/f0/c9/8d/f0c98d20-d5a5-6789-6c0b-15b74336a262/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg",
+    "width": 256,
+    "asset": "assets/banks/albaraka.png",
+    "publisher": "Al Baraka Bank Of Egypt",
+    "app_url": "https://apps.apple.com/eg/app/albaraka-bank-mobile/id6479031504?uo=4"
+  },
+  "ATTIJARI": {
+    "website": "https://attijariwafabank.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=attijariwafabank.com.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/attijari.png"
+  },
+  "MASHREQ": {
+    "website": "https://mashreq.com",
+    "source": "https://www.google.com/s2/favicons?domain=mashreq.com&sz=128",
+    "width": 124,
+    "asset": "assets/banks/mashreq.png"
+  },
+  "CITI": {
+    "website": "https://citibank.com",
+    "source": "https://www.google.com/s2/favicons?domain=citibank.com&sz=128",
+    "width": 128,
+    "asset": "assets/banks/citi.png"
+  },
+  "SC": {
+    "website": "https://sc.com",
+    "source": "https://www.google.com/s2/favicons?domain=sc.com&sz=128",
+    "width": 128,
+    "asset": "assets/banks/sc.png"
+  },
+  "ONEBANK": {
+    "website": "https://onebank.eg",
+    "source": "https://www.google.com/s2/favicons?domain=onebank.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/onebank.png"
+  },
+  "NASSER": {
+    "website": "https://nsb.gov.eg",
+    "source": "https://www.google.com/s2/favicons?domain=nsb.gov.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/nasser.png"
+  },
+  "INSTAPAY": {
+    "website": "https://instapay.eg",
+    "source": "https://www.google.com/s2/favicons?domain=www.instapay.eg&sz=128",
+    "width": 128,
+    "asset": "assets/banks/instapay.png"
+  },
+  "VODAFONECASH": {
+    "website": "https://web.vodafone.com.eg",
+    "source": "https://www.google.com/s2/favicons?domain=web.vodafone.com.eg&sz=128",
+    "width": 16,
+    "asset": "assets/banks/vodafonecash.png"
+  },
+  "ORANGECASH": {
+    "website": "https://orange.eg",
+    "source": "https://www.google.com/s2/favicons?domain=orange.eg&sz=128",
+    "width": 16,
+    "asset": "assets/banks/orangecash.png"
+  },
+  "ETISALATCASH": {
+    "website": "https://etisalat.eg",
+    "source": "https://www.google.com/s2/favicons?domain=etisalat.eg&sz=128",
+    "width": 48,
+    "asset": "assets/banks/etisalatcash.png"
+  },
+  "WEPAY": {
+    "website": "https://te.eg",
+    "source": "https://www.google.com/s2/favicons?domain=te.eg&sz=128",
+    "width": 16,
+    "asset": "assets/banks/wepay.png"
+  }
+}

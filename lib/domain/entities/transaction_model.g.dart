@@ -6,32 +6,32 @@ part of 'transaction_model.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$TransactionImpl _$$TransactionImplFromJson(Map<String, dynamic> json) =>
-    _$TransactionImpl(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      bankId: json['bank_id'] as String?,
-      categoryId: json['category_id'] as String?,
-      merchantId: json['merchant_id'] as String?,
-      type: $enumDecode(_$TransactionTypeEnumMap, json['type']),
-      source: $enumDecode(_$TransactionSourceEnumMap, json['source']),
-      amountMinor: (json['amount_minor'] as num).toInt(),
-      currency: json['currency'] as String? ?? 'EGP',
-      transactionDate: DateTime.parse(json['transaction_date'] as String),
-      merchantName: json['merchant_name'] as String?,
-      cardLast4: json['card_last4'] as String?,
-      cardId: json['card_id'] as String?,
-      rawReference: json['raw_reference'] as String?,
-      externalReference: json['external_reference'] as String?,
-      fingerprint: json['fingerprint'] as String,
-      status: $enumDecodeNullable(_$TransactionStatusEnumMap, json['status']) ??
-          TransactionStatus.confirmed,
-      notes: json['notes'] as String?,
-      createdAt: _dateTimeFromJson(json['created_at']),
-      updatedAt: _dateTimeFromJson(json['updated_at']),
-    );
+_Transaction _$TransactionFromJson(Map<String, dynamic> json) => _Transaction(
+  id: json['id'] as String,
+  userId: json['user_id'] as String,
+  bankId: json['bank_id'] as String?,
+  categoryId: json['category_id'] as String?,
+  merchantId: json['merchant_id'] as String?,
+  type: $enumDecode(_$TransactionTypeEnumMap, json['type']),
+  source: $enumDecode(_$TransactionSourceEnumMap, json['source']),
+  amountMinor: (json['amount_minor'] as num).toInt(),
+  currency: json['currency'] as String? ?? 'EGP',
+  transactionDate: DateTime.parse(json['transaction_date'] as String),
+  merchantName: json['merchant_name'] as String?,
+  cardLast4: json['card_last4'] as String?,
+  cardId: json['card_id'] as String?,
+  rawReference: json['raw_reference'] as String?,
+  externalReference: json['external_reference'] as String?,
+  fingerprint: json['fingerprint'] as String,
+  status:
+      $enumDecodeNullable(_$TransactionStatusEnumMap, json['status']) ??
+      TransactionStatus.confirmed,
+  notes: json['notes'] as String?,
+  createdAt: _dateTimeFromJson(json['created_at']),
+  updatedAt: _dateTimeFromJson(json['updated_at']),
+);
 
-Map<String, dynamic> _$$TransactionImplToJson(_$TransactionImpl instance) =>
+Map<String, dynamic> _$TransactionToJson(_Transaction instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,
@@ -82,34 +82,33 @@ const _$TransactionStatusEnumMap = {
   TransactionStatus.reversed: 'reversed',
 };
 
-_$SMSMessageImpl _$$SMSMessageImplFromJson(Map<String, dynamic> json) =>
-    _$SMSMessageImpl(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      sender: json['sender'] as String?,
-      messageHash: json['message_hash'] as String,
-      receivedAt: _dateTimeFromJsonRequired(json['received_at']),
-      processedAt: _dateTimeFromJson(json['processed_at']),
-      processingStatus: json['processing_status'] as String? ?? 'pending',
-      messageBody: json['message_body'] as String?,
-      bankIdentified: json['bank_identified'] as bool? ?? false,
-      typeIdentified: json['type_identified'] as bool? ?? false,
-      amountIdentified: json['amount_identified'] as bool? ?? false,
-      currencyIdentified: json['currency_identified'] as bool? ?? false,
-      cardLast4Identified: json['card_last4_identified'] as bool? ?? false,
-      detectedBankId: json['detected_bank_id'] as String?,
-      detectedBankName: json['detected_bank_name'] as String?,
-      detectedType: json['detected_type'] as String?,
-      detectedAmountMinor: (json['detected_amount_minor'] as num?)?.toInt(),
-      detectedCurrency: json['detected_currency'] as String?,
-      detectedCardLast4: json['detected_card_last4'] as String?,
-      transactionId: json['transaction_id'] as String?,
-      parserVersion: json['parser_version'] as String?,
-      confidence: (json['confidence'] as num?)?.toDouble(),
-      createdAt: _dateTimeFromJson(json['created_at']),
-    );
+_SMSMessage _$SMSMessageFromJson(Map<String, dynamic> json) => _SMSMessage(
+  id: json['id'] as String,
+  userId: json['user_id'] as String,
+  sender: json['sender'] as String?,
+  messageHash: json['message_hash'] as String,
+  receivedAt: _dateTimeFromJsonRequired(json['received_at']),
+  processedAt: _dateTimeFromJson(json['processed_at']),
+  processingStatus: json['processing_status'] as String? ?? 'pending',
+  messageBody: json['message_body'] as String?,
+  bankIdentified: json['bank_identified'] as bool? ?? false,
+  typeIdentified: json['type_identified'] as bool? ?? false,
+  amountIdentified: json['amount_identified'] as bool? ?? false,
+  currencyIdentified: json['currency_identified'] as bool? ?? false,
+  cardLast4Identified: json['card_last4_identified'] as bool? ?? false,
+  detectedBankId: json['detected_bank_id'] as String?,
+  detectedBankName: json['detected_bank_name'] as String?,
+  detectedType: json['detected_type'] as String?,
+  detectedAmountMinor: (json['detected_amount_minor'] as num?)?.toInt(),
+  detectedCurrency: json['detected_currency'] as String?,
+  detectedCardLast4: json['detected_card_last4'] as String?,
+  transactionId: json['transaction_id'] as String?,
+  parserVersion: json['parser_version'] as String?,
+  confidence: (json['confidence'] as num?)?.toDouble(),
+  createdAt: _dateTimeFromJson(json['created_at']),
+);
 
-Map<String, dynamic> _$$SMSMessageImplToJson(_$SMSMessageImpl instance) =>
+Map<String, dynamic> _$SMSMessageToJson(_SMSMessage instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,
@@ -136,56 +135,52 @@ Map<String, dynamic> _$$SMSMessageImplToJson(_$SMSMessageImpl instance) =>
       'created_at': instance.createdAt?.toIso8601String(),
     };
 
-_$ExpenseImpl _$$ExpenseImplFromJson(Map<String, dynamic> json) =>
-    _$ExpenseImpl(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      transactionId: json['transaction_id'] as String?,
-      categoryId: json['category_id'] as String?,
-      amountMinor: (json['amount_minor'] as num).toInt(),
-      currency: json['currency'] as String? ?? 'EGP',
-      expenseDate: _dateTimeFromJsonRequired(json['expense_date']),
-      paymentMethod:
-          $enumDecode(_$PaymentMethodEnumMap, json['payment_method']),
-      merchantId: json['merchant_id'] as String?,
-      notes: json['notes'] as String?,
-      createdAt: _dateTimeFromJson(json['created_at']),
-      updatedAt: _dateTimeFromJson(json['updated_at']),
-    );
+_Expense _$ExpenseFromJson(Map<String, dynamic> json) => _Expense(
+  id: json['id'] as String,
+  userId: json['user_id'] as String,
+  transactionId: json['transaction_id'] as String?,
+  categoryId: json['category_id'] as String?,
+  amountMinor: (json['amount_minor'] as num).toInt(),
+  currency: json['currency'] as String? ?? 'EGP',
+  expenseDate: _dateTimeFromJsonRequired(json['expense_date']),
+  paymentMethod: $enumDecode(_$PaymentMethodEnumMap, json['payment_method']),
+  merchantId: json['merchant_id'] as String?,
+  notes: json['notes'] as String?,
+  createdAt: _dateTimeFromJson(json['created_at']),
+  updatedAt: _dateTimeFromJson(json['updated_at']),
+);
 
-Map<String, dynamic> _$$ExpenseImplToJson(_$ExpenseImpl instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'user_id': instance.userId,
-      'transaction_id': instance.transactionId,
-      'category_id': instance.categoryId,
-      'amount_minor': instance.amountMinor,
-      'currency': instance.currency,
-      'expense_date': instance.expenseDate.toIso8601String(),
-      'payment_method': _$PaymentMethodEnumMap[instance.paymentMethod]!,
-      'merchant_id': instance.merchantId,
-      'notes': instance.notes,
-      'created_at': instance.createdAt?.toIso8601String(),
-      'updated_at': instance.updatedAt?.toIso8601String(),
-    };
+Map<String, dynamic> _$ExpenseToJson(_Expense instance) => <String, dynamic>{
+  'id': instance.id,
+  'user_id': instance.userId,
+  'transaction_id': instance.transactionId,
+  'category_id': instance.categoryId,
+  'amount_minor': instance.amountMinor,
+  'currency': instance.currency,
+  'expense_date': instance.expenseDate.toIso8601String(),
+  'payment_method': _$PaymentMethodEnumMap[instance.paymentMethod]!,
+  'merchant_id': instance.merchantId,
+  'notes': instance.notes,
+  'created_at': instance.createdAt?.toIso8601String(),
+  'updated_at': instance.updatedAt?.toIso8601String(),
+};
 
 const _$PaymentMethodEnumMap = {
   PaymentMethod.cash: 'cash',
   PaymentMethod.card: 'card',
 };
 
-_$ExpenseItemImpl _$$ExpenseItemImplFromJson(Map<String, dynamic> json) =>
-    _$ExpenseItemImpl(
-      id: json['id'] as String,
-      expenseId: json['expense_id'] as String,
-      itemId: json['item_id'] as String,
-      quantity: (json['quantity'] as num).toInt(),
-      unitPriceMinor: (json['unit_price_minor'] as num).toInt(),
-      totalPriceMinor: (json['total_price_minor'] as num).toInt(),
-      createdAt: _dateTimeFromJson(json['created_at']),
-    );
+_ExpenseItem _$ExpenseItemFromJson(Map<String, dynamic> json) => _ExpenseItem(
+  id: json['id'] as String,
+  expenseId: json['expense_id'] as String,
+  itemId: json['item_id'] as String,
+  quantity: (json['quantity'] as num).toInt(),
+  unitPriceMinor: (json['unit_price_minor'] as num).toInt(),
+  totalPriceMinor: (json['total_price_minor'] as num).toInt(),
+  createdAt: _dateTimeFromJson(json['created_at']),
+);
 
-Map<String, dynamic> _$$ExpenseItemImplToJson(_$ExpenseItemImpl instance) =>
+Map<String, dynamic> _$ExpenseItemToJson(_ExpenseItem instance) =>
     <String, dynamic>{
       'id': instance.id,
       'expense_id': instance.expenseId,
@@ -196,19 +191,18 @@ Map<String, dynamic> _$$ExpenseItemImplToJson(_$ExpenseItemImpl instance) =>
       'created_at': instance.createdAt?.toIso8601String(),
     };
 
-_$ItemUsageImpl _$$ItemUsageImplFromJson(Map<String, dynamic> json) =>
-    _$ItemUsageImpl(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      itemId: json['item_id'] as String,
-      expenseId: json['expense_id'] as String,
-      quantity: (json['quantity'] as num).toInt(),
-      totalAmountMinor: (json['total_amount_minor'] as num).toInt(),
-      usageDate: _dateTimeFromJsonRequired(json['usage_date']),
-      createdAt: _dateTimeFromJson(json['created_at']),
-    );
+_ItemUsage _$ItemUsageFromJson(Map<String, dynamic> json) => _ItemUsage(
+  id: json['id'] as String,
+  userId: json['user_id'] as String,
+  itemId: json['item_id'] as String,
+  expenseId: json['expense_id'] as String,
+  quantity: (json['quantity'] as num).toInt(),
+  totalAmountMinor: (json['total_amount_minor'] as num).toInt(),
+  usageDate: _dateTimeFromJsonRequired(json['usage_date']),
+  createdAt: _dateTimeFromJson(json['created_at']),
+);
 
-Map<String, dynamic> _$$ItemUsageImplToJson(_$ItemUsageImpl instance) =>
+Map<String, dynamic> _$ItemUsageToJson(_ItemUsage instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,

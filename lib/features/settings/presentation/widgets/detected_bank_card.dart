@@ -1,3 +1,6 @@
+import '../../../../core/widgets/common/bank_logo.dart';
+import '../../../../core/localization/app_localizations.dart';
+import '../../../../domain/entities/bank_directory.dart';
 import '../../../../core/theme/card_appearance_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -122,10 +125,8 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CardCustomizationSheet(
-        card: widget.card,
-        repository: cubit,
-      ),
+      builder: (_) =>
+          CardCustomizationSheet(card: widget.card, repository: cubit),
     ).then((_) => cubit.reload());
   }
 
@@ -135,7 +136,7 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avgLum =
         colors.map((c) => c.computeLuminance()).reduce((a, b) => a + b) /
-            colors.length;
+        colors.length;
     final fg = avgLum > 0.45 ? const Color(0xFF1A1A2E) : Colors.white;
 
     return Container(
@@ -184,12 +185,21 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      BankLogo(bankName: widget.card.bankName, size: 30),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           DisplayTextGuard.label(
                             widget.card.bankName?.isNotEmpty == true
-                                ? widget.card.bankName!
-                                : 'Bank',
+                                ? BankCatalog.displayName(
+                                    widget.card.bankName,
+                                    arabic:
+                                        Localizations.localeOf(
+                                          context,
+                                        ).languageCode ==
+                                        'ar',
+                                  )
+                                : AppLocalizations.s(context)['bankUnknown'],
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -234,11 +244,7 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
                               color: fg.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
-                              Icons.credit_card,
-                              color: fg,
-                              size: 17,
-                            ),
+                            child: Icon(Icons.credit_card, color: fg, size: 17),
                           ),
                         ),
                       ],
@@ -252,8 +258,11 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
                             color: fg.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
-                          child:
-                              Icon(Icons.brush_outlined, color: fg, size: 17),
+                          child: Icon(
+                            Icons.brush_outlined,
+                            color: fg,
+                            size: 17,
+                          ),
                         ),
                       ),
                     ],
@@ -272,7 +281,9 @@ class _DetectedBankCardState extends State<DetectedBankCard> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${widget.card.transactionCount} transactions',
+                    AppLocalizations.s(context).t('transactionCount', {
+                      'count': '${widget.card.transactionCount}',
+                    }),
                     style: TextStyle(
                       color: fg.withValues(alpha: 0.75),
                       fontSize: 12,
@@ -301,7 +312,7 @@ class _EmvChip extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             color.withValues(alpha: 0.85),
-            color.withValues(alpha: 0.55)
+            color.withValues(alpha: 0.55),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -324,9 +335,15 @@ class _ChipLines extends CustomPainter {
       ..color = color.withValues(alpha: 0.5)
       ..strokeWidth = 1;
     canvas.drawLine(
-        Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      paint,
+    );
     canvas.drawLine(
-        Offset(size.width / 2, 0), Offset(size.width / 2, size.height), paint);
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      paint,
+    );
   }
 
   @override

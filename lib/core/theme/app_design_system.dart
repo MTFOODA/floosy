@@ -5,34 +5,36 @@ class FloosyDesign {
   FloosyDesign._();
 
   // ── Colors ──────────────────────────────────────────────────────────────
-  static const Color background = Color(0xFF0C0E1B);
-  static const Color backgroundAlt = Color(0xFF080D1A);
-  static const Color authBackground = Color(0xFF0C0E1B);
-  static const Color primarySurface = Color(0xFF151827);
-  static const Color secondarySurface = Color(0xFF191C2D);
-  static const Color elevatedSurface = Color(0xFF1D2033);
-  static const Color cardSurface = Color(0xFF151F32);
-  static const Color inputBackground = Color(0xFF1B2030);
-  static const Color toggleBackground = Color(0xFF20253A);
-  static const Color navBackground = Color(0xFF0B0D1C);
-  static const Color chatBubbleUser = Color(0xFF171A2B);
+  static const Color background = Color(0xFF071421);
+  static const Color backgroundAlt = Color(0xFF05101A);
+  static const Color authBackground = Color(0xFF071421);
+  static const Color primarySurface = Color(0xFF102331);
+  static const Color secondarySurface = Color(0xFF132B3A);
+  static const Color elevatedSurface = Color(0xFF183546);
+  static const Color cardSurface = Color(0xFF10293A);
+  static const Color inputBackground = Color(0xFF142C3B);
+  static const Color toggleBackground = Color(0xFF1C3A4B);
+  static const Color navBackground = Color(0xFF071621);
+  static const Color chatBubbleUser = Color(0xFF123042);
 
   static const Color borderSubtle = Color(0x14FFFFFF);
   static const Color borderLight = Color(0x0FFFFFFF);
-  static const Color inputBorder = Color(0xFF2A3042);
+  static const Color inputBorder = Color(0xFF285064);
 
-  static const Color primaryPurple = Color(0xFF806DF3);
-  static const Color brightPurple = Color(0xFF9B8AFF);
-  static const Color purpleStart = Color(0xFF6F5BD3);
-  static const Color purpleEnd = Color(0xFF8A78E8);
-  static const Color blue = Color(0xFF55AFFF);
-  static const Color cyan = Color(0xFF12BFFF);
-  static const Color positive = Color(0xFF20D9A6);
+  // Legacy identifiers remain for source compatibility. The visual identity
+  // is navy + teal; no purple or mauve values are used in the active theme.
+  static const Color primaryPurple = Color(0xFF16BFB1);
+  static const Color brightPurple = Color(0xFF42E0CB);
+  static const Color purpleStart = Color(0xFF0C526A);
+  static const Color purpleEnd = Color(0xFF18C7B5);
+  static const Color blue = Color(0xFF38A7D8);
+  static const Color cyan = Color(0xFF27D5CD);
+  static const Color positive = Color(0xFF2AD5AB);
   static const Color negative = Color(0xFFFF6B72);
   static const Color orange = Color(0xFFFFB84D);
   static const Color warmYellow = Color(0xFFE8A72E);
   static const Color coralRed = Color(0xFFD9433D);
-  static const Color pink = Color(0xFFF05B9A);
+  static const Color pink = Color(0xFFFF746B);
 
   static const Color textPrimary = Color(0xFFF5F4FF);
   static const Color textSecondary = Color(0xFF9699B3);
@@ -50,7 +52,7 @@ class FloosyDesign {
   );
 
   static const LinearGradient balanceGradient = LinearGradient(
-    colors: [Color(0xFF1D2033), Color(0xFF151827)],
+    colors: [Color(0xFF153C50), Color(0xFF0B2231)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -160,8 +162,11 @@ class FloosyDesign {
 }
 
 /// A subtle glowing box shadow used on focused inputs and the AI nav button.
-List<BoxShadow> glowShadow(Color color,
-    {double radius = 12, double opacity = 0.25}) {
+List<BoxShadow> glowShadow(
+  Color color, {
+  double radius = 12,
+  double opacity = 0.25,
+}) {
   return [
     BoxShadow(
       color: color.withValues(alpha: opacity),
@@ -275,10 +280,11 @@ class FloosyPalette {
 
   // ── Theme-aware text styles (same geometry as FloosyDesign) ──────────────
   TextStyle get logo => TextStyle(
-      fontSize: 52,
-      fontWeight: FontWeight.bold,
-      color: textPrimary,
-      letterSpacing: -1);
+    fontSize: 52,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+    letterSpacing: -1,
+  );
   TextStyle get pageTitle =>
       TextStyle(fontSize: 28, fontWeight: FontWeight.w600, color: textPrimary);
   TextStyle get sectionTitle =>
@@ -293,9 +299,10 @@ class FloosyPalette {
   TextStyle get bodyTextSmall => TextStyle(fontSize: 12, color: textSecondary);
   TextStyle get navLabel => TextStyle(fontSize: 11, color: textSecondary);
   TextStyle get navLabelActive => const TextStyle(
-      fontSize: 11,
-      color: FloosyDesign.primaryPurple,
-      fontWeight: FontWeight.w600);
+    fontSize: 11,
+    color: FloosyDesign.primaryPurple,
+    fontWeight: FontWeight.w600,
+  );
 }
 
 /// Resolves the current theme's Floosy palette from any BuildContext:

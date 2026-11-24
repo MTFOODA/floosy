@@ -19,8 +19,7 @@ class SmsInboxMessage {
 ///
 /// Retrieval is deliberately unfiltered: every inbox message is returned and
 /// financial relevance is decided LATER by the parser/classifier, never by
-/// the retrieval layer (requirement #7). Diagnostic logs are truncated
-/// previews only — full SMS bodies are never logged.
+/// the retrieval layer. Message bodies and sender identifiers are never logged.
 class SmsInboxService {
   static const MethodChannel _channel = MethodChannel('floosy/sms');
 
@@ -37,8 +36,8 @@ class SmsInboxService {
     }
   }
 
-  /// Reads up to [maxCount] most-recent inbox messages. Returns an empty
-  /// list when permission is missing or the query fails (never throws).
+  /// Reads up to [maxCount] most-recent inbox messages. Read failures throw so
+  /// callers can retry without mistaking an unavailable inbox for completed history.
   ///
   /// [sinceDate] / [untilDate] narrow the native SQL query to the given
   /// window (used by the SMS Detection Range feature): a historical
@@ -52,9 +51,11 @@ class SmsInboxService {
     DateTime? sinceDate,
     DateTime? untilDate,
   }) async {
-    logInfo('SMS_QUERY: reading inbox (max $maxCount'
-        '${sinceDate != null ? ', since ${sinceDate.toIso8601String()}' : ''}'
-        '${untilDate != null ? ', until ${untilDate.toIso8601String()}' : ''})');
+    logInfo(
+      'SMS_QUERY: reading inbox (max $maxCount'
+      '${sinceDate != null ? ', since ${sinceDate.toIso8601String()}' : ''}'
+      '${untilDate != null ? ', until ${untilDate.toIso8601String()}' : ''})',
+    );
     try {
       final args = <String, dynamic>{'maxCount': maxCount};
       if (sinceDate != null) {
@@ -63,8 +64,10 @@ class SmsInboxService {
       if (untilDate != null) {
         args['untilDateMs'] = untilDate.millisecondsSinceEpoch;
       }
-      final raw =
-          await _channel.invokeMethod<List<dynamic>>('queryInbox', args);
+      final raw = await _channel.invokeMethod<List<dynamic>>(
+        'queryInbox',
+        args,
+      );
       final messages = <SmsInboxMessage>[];
       for (final entry in raw ?? const []) {
         final map = Map<String, dynamic>.from(entry as Map);
@@ -83,27 +86,13 @@ class SmsInboxService {
       // a contributor to the MIUI ANR ("DartMessenger ... execute time>50ms").
       // Per-message previews are only emitted for small (incremental) reads.
       logInfo('SMS_READ count=${messages.length}');
-      if (messages.isNotEmpty && messages.length <= 5) {
-        for (final message in messages) {
-          logDebug('SMS_MESSAGE sender=${message.sender} '
-              'date=${message.date.toIso8601String()} '
-              'bodyLength=${message.body.length} '
-              'preview=${_preview(message.body)}');
-        }
-      }
       return messages;
     } on PlatformException catch (e) {
       logError('SMS_QUERY failed: ${e.code} ${e.message}', e);
-      return const [];
+      rethrow;
     } on MissingPluginException {
       logWarning('SMS_QUERY: platform channel unavailable (not Android)');
-      return const [];
+      rethrow;
     }
-  }
-
-  /// Truncated, newline-free preview safe for logs.
-  String _preview(String body) {
-    final flat = body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return flat.length <= 60 ? flat : '${flat.substring(0, 60)}…';
   }
 }

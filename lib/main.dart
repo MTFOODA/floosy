@@ -1,11 +1,14 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'data/remote/financial_network_boundary.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/presentation_dependencies.dart';
 import 'app/app_runtime.dart';
 import 'app/composition_root.dart';
 import 'app/app_scope.dart';
+import 'app/local_data_gate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'routing/app_router.dart';
 import 'theme/app_theme.dart';
@@ -21,17 +24,25 @@ void main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
+    debug: false,
+    httpClient: FinancialNetworkBoundary(
+      http.Client(),
+      Uri.parse(SupabaseConfig.url).host,
+    ),
   );
 
   final dependencies = AppDependencies();
   final runtime = AppRuntime(dependencies.repositories());
   dependencies.currentUserId = () => runtime.auth.state.userId;
   dependencies.onDataChanged = runtime.refresh.refresh;
-  runApp(AppScope(
+  runApp(
+    AppScope(
       runtime: runtime,
       ownsRuntime: true,
       disposeDependencies: dependencies.close,
-      child: const FloosyApp()));
+      child: const FloosyApp(),
+    ),
+  );
 }
 
 class FloosyApp extends StatefulWidget {
@@ -54,13 +65,15 @@ class _FloosyAppState extends State<FloosyApp> {
   void initState() {
     super.initState();
     _router = AppRouterController(
-        context.read<AuthCubit>(), context.read<AppLockCubit>());
+      context.read<AuthCubit>(),
+      context.read<AppLockCubit>(),
+    );
     _sms = context.read<SmsCubit>();
-    _sms.start();
-    // Requirement #17: the manual "فحص رسائل البنك" button was removed, so
-    // READ_SMS must be requested automatically once per app session —
-    // otherwise the polling pipeline runs with no permission and silently
-    // reads an empty inbox (this was why SMS transactions stopped appearing).
+    // Ask for Android's SMS permission once per app session. AppRuntime starts
+    // the importer only after sign-in and after the encrypted ledger is ready.
+    // Keeping the two responsibilities separate is important: starting a
+    // second historical scan here can contend with the poller immediately
+    // after login and make a busy inbox unresponsive.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestSmsPermissionOnce();
     });
@@ -71,6 +84,9 @@ class _FloosyAppState extends State<FloosyApp> {
     _smsPermissionRequested = true;
     if (kIsWeb || !Platform.isAndroid) return;
     await SmsPermissionService.requestAtStartup();
+    // Do not call scanNow(fullScan: true) from the app shell. The polling
+    // service owns the single bounded, month-start import once a signed-in
+    // user's local data is prepared.
   }
 
   @override
@@ -93,8 +109,9 @@ class _FloosyAppState extends State<FloosyApp> {
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
-      builder: (context, child) =>
-          BiometricGate(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => BiometricGate(
+        child: LocalDataGate(child: child ?? const SizedBox.shrink()),
+      ),
       locale: locale,
       supportedLocales: supportedLocales,
       localizationsDelegates: const [

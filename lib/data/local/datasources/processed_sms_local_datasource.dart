@@ -40,7 +40,9 @@ class ProcessedSmsLocalDataSource {
   /// processed twice can never create a duplicate ledger row (and the caller
   /// never has to check first).
   Future<void> markProcessed(ProcessedSmsRecord record) async {
-    await _db.into(_db.processedSmsMessages).insert(
+    await _db
+        .into(_db.processedSmsMessages)
+        .insert(
           db.ProcessedSmsMessagesCompanion.insert(
             id: record.id,
             userId: record.userId,
@@ -56,10 +58,12 @@ class ProcessedSmsLocalDataSource {
 
   /// True when an SMS with [messageHash] was already processed for [userId].
   Future<bool> isProcessed(String userId, String messageHash) async {
-    final row = await (_db.select(_db.processedSmsMessages)
-          ..where((t) =>
-              t.userId.equals(userId) & t.messageHash.equals(messageHash)))
-        .getSingleOrNull();
+    final row =
+        await (_db.select(_db.processedSmsMessages)..where(
+              (t) =>
+                  t.userId.equals(userId) & t.messageHash.equals(messageHash),
+            ))
+            .getSingleOrNull();
     return row != null;
   }
 
@@ -72,12 +76,15 @@ class ProcessedSmsLocalDataSource {
     // large scans.
     const chunkSize = 500;
     for (var i = 0; i < hashes.length; i += chunkSize) {
-      final end =
-          (i + chunkSize) > hashes.length ? hashes.length : i + chunkSize;
+      final end = (i + chunkSize) > hashes.length
+          ? hashes.length
+          : i + chunkSize;
       final chunk = hashes.sublist(i, end);
-      final rows = await (_db.select(_db.processedSmsMessages)
-            ..where((t) => t.userId.equals(userId) & t.messageHash.isIn(chunk)))
-          .get();
+      final rows =
+          await (_db.select(_db.processedSmsMessages)..where(
+                (t) => t.userId.equals(userId) & t.messageHash.isIn(chunk),
+              ))
+              .get();
       for (final row in rows) {
         known.add(row.messageHash);
       }
@@ -102,8 +109,8 @@ class ProcessedSmsLocalDataSource {
 
   /// Removes the whole processed ledger for [userId] (data-reset flow only).
   Future<int> clearForUser(String userId) async {
-    return (_db.delete(_db.processedSmsMessages)
-          ..where((t) => t.userId.equals(userId)))
-        .go();
+    return (_db.delete(
+      _db.processedSmsMessages,
+    )..where((t) => t.userId.equals(userId))).go();
   }
 }

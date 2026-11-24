@@ -17,13 +17,13 @@ enum AlertType {
   high_spending,
   subscription_detected,
   cash_difference,
-  saving_opportunity
+  saving_opportunity,
 }
 
 enum AlertSeverity { info, warning, critical }
 
 @freezed
-class Alert with _$Alert {
+abstract class Alert with _$Alert {
   const factory Alert({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -43,7 +43,7 @@ class Alert with _$Alert {
 }
 
 @freezed
-class Badge with _$Badge {
+abstract class Badge with _$Badge {
   const factory Badge({
     required String id,
     required String code,
@@ -61,7 +61,7 @@ class Badge with _$Badge {
 }
 
 @freezed
-class UserBadge with _$UserBadge {
+abstract class UserBadge with _$UserBadge {
   const factory UserBadge({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -76,7 +76,7 @@ class UserBadge with _$UserBadge {
 }
 
 @freezed
-class MonthlyReport with _$MonthlyReport {
+abstract class MonthlyReport with _$MonthlyReport {
   const factory MonthlyReport({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -107,7 +107,7 @@ class MonthlyReport with _$MonthlyReport {
 }
 
 @freezed
-class MonthlyItemStatistic with _$MonthlyItemStatistic {
+abstract class MonthlyItemStatistic with _$MonthlyItemStatistic {
   const factory MonthlyItemStatistic({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -139,7 +139,7 @@ class MonthlyItemStatistic with _$MonthlyItemStatistic {
 }
 
 @freezed
-class AppNotification with _$AppNotification {
+abstract class AppNotification with _$AppNotification {
   const factory AppNotification({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -160,7 +160,7 @@ class AppNotification with _$AppNotification {
 }
 
 @freezed
-class AuditLog with _$AuditLog {
+abstract class AuditLog with _$AuditLog {
   const factory AuditLog({
     required String id,
     @JsonKey(name: 'user_id') String? userId,

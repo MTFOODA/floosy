@@ -1,0 +1,1266 @@
+{
+  "functions": [
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\r\nBEGIN\r\n  NEW.updated_at = now();\r\n  RETURN NEW;\r\nEND;\r\n$function$\n",
+      "name": "set_updated_at"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.rls_auto_enable()\n RETURNS event_trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE\n  cmd record;\nBEGIN\n  FOR cmd IN\n    SELECT *\n    FROM pg_event_trigger_ddl_commands()\n    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n      AND object_type IN ('table','partitioned table')\n  LOOP\n     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN\n      BEGIN\n        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);\n        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;\n      EXCEPTION\n        WHEN OTHERS THEN\n          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;\n      END;\n     ELSE\n        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;\n     END IF;\n  END LOOP;\nEND;\n$function$\n",
+      "name": "rls_auto_enable"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_monthly_spending(user_id_param uuid, year_param smallint, month_param smallint)\n RETURNS TABLE(category_id uuid, category_name character varying, total_amount_minor bigint)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT c.id, c.name, COALESCE(SUM(e.amount_minor), 0)::bigint AS total_amount_minor\r\n  FROM public.categories c\r\n  LEFT JOIN public.expenses e\r\n    ON c.id = e.category_id\r\n   AND e.user_id = user_id_param\r\n   AND extract(year FROM e.expense_date) = year_param\r\n   AND extract(month FROM e.expense_date) = month_param\r\n  WHERE c.user_id = user_id_param OR c.is_system = true\r\n  GROUP BY c.id, c.name\r\n  ORDER BY total_amount_minor DESC;\r\n$function$\n",
+      "name": "get_monthly_spending"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_item_usage_stats(user_id_param uuid, year_param smallint, month_param smallint)\n RETURNS TABLE(item_id uuid, item_name character varying, quantity bigint, total_spending_minor bigint, average_price_minor bigint)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT i.id, i.name,\r\n    COALESCE(SUM(iu.quantity), 0)::bigint AS quantity,\r\n    COALESCE(SUM(iu.total_amount_minor), 0)::bigint AS total_spending_minor,\r\n    CASE\r\n      WHEN COALESCE(SUM(iu.quantity), 0) > 0\r\n        THEN (COALESCE(SUM(iu.total_amount_minor), 0)\r\n              / COALESCE(SUM(iu.quantity), 1))::bigint\r\n      ELSE 0\r\n    END AS average_price_minor\r\n  FROM public.items i\r\n  LEFT JOIN public.item_usage iu\r\n    ON i.id = iu.item_id\r\n   AND iu.user_id = user_id_param\r\n   AND extract(year FROM iu.usage_date) = year_param\r\n   AND extract(month FROM iu.usage_date) = month_param\r\n  WHERE i.user_id = user_id_param AND i.is_active = true\r\n  GROUP BY i.id, i.name\r\n  ORDER BY quantity DESC;\r\n$function$\n",
+      "name": "get_item_usage_stats"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.calculate_savings_opportunity(user_id_param uuid, item_id_param uuid, reduction_percentage_param numeric)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT CASE\r\n    WHEN COALESCE(SUM(iu.total_amount_minor), 0) > 0\r\n      THEN (COALESCE(SUM(iu.total_amount_minor), 0)\r\n            * reduction_percentage_param / 100)::bigint\r\n    ELSE 0\r\n  END\r\n  FROM public.item_usage iu\r\n  WHERE iu.user_id = user_id_param AND iu.item_id = item_id_param\r\n    AND extract(year FROM iu.usage_date) = extract(year FROM now())\r\n    AND extract(month FROM iu.usage_date) = extract(month FROM now());\r\n$function$\n",
+      "name": "calculate_savings_opportunity"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_bank_accounts_with_balance(user_id_param uuid)\n RETURNS TABLE(id uuid, name character varying, bank_id uuid, currency character varying, opening_balance_minor bigint, balance_minor bigint, is_active boolean)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT a.id, a.name, a.bank_id, a.currency, a.opening_balance_minor,\r\n    a.opening_balance_minor\r\n      + COALESCE((SELECT SUM(m.amount_minor)\r\n                   FROM public.user_bank_movements m\r\n                  WHERE m.account_id = a.id AND m.type = 'in'), 0)\r\n      - COALESCE((SELECT SUM(m.amount_minor)\r\n                   FROM public.user_bank_movements m\r\n                  WHERE m.account_id = a.id AND m.type = 'out'), 0)\r\n      AS balance_minor,\r\n    a.is_active\r\n  FROM public.user_bank_accounts a\r\n  WHERE a.user_id = user_id_param\r\n  ORDER BY a.created_at;\r\n$function$\n",
+      "name": "get_bank_accounts_with_balance"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_total_bank_balance(user_id_param uuid)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT COALESCE(SUM(b.balance), 0) FROM (\r\n    SELECT a.opening_balance_minor\r\n      + COALESCE((SELECT SUM(m.amount_minor)\r\n                   FROM public.user_bank_movements m\r\n                  WHERE m.account_id = a.id AND m.type = 'in'), 0)\r\n      - COALESCE((SELECT SUM(m.amount_minor)\r\n                   FROM public.user_bank_movements m\r\n                  WHERE m.account_id = a.id AND m.type = 'out'), 0) AS balance\r\n    FROM public.user_bank_accounts a\r\n    WHERE a.user_id = user_id_param AND a.is_active = true\r\n  ) b;\r\n$function$\n",
+      "name": "get_total_bank_balance"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.handle_new_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nBEGIN\r\n  INSERT INTO public.profiles (id, email, full_name)\r\n  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data ->> 'full_name')\r\n  ON CONFLICT (id) DO NOTHING;\r\n\r\n  INSERT INTO public.cash_wallets (user_id)\r\n  VALUES (NEW.id)\r\n  ON CONFLICT (user_id) DO NOTHING;\r\n\r\n  RETURN NEW;\r\nEND;\r\n$function$\n",
+      "name": "handle_new_user"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_cash_balance(user_id_param uuid)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT COALESCE(SUM(\r\n    CASE WHEN cm.type = 'in' THEN cm.amount_minor ELSE -cm.amount_minor END\r\n  ), 0)\r\n  FROM public.cash_movements cm\r\n  WHERE cm.user_id = user_id_param;\r\n$function$\n",
+      "name": "get_cash_balance"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.get_deducted_money(user_id_param uuid, year_param smallint, month_param smallint)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  SELECT COALESCE(SUM(t.amount_minor), 0)::bigint\r\n  FROM public.transactions t\r\n  WHERE t.user_id = user_id_param\r\n    AND t.status = 'confirmed'\r\n    AND t.type IN ('purchase', 'cash_expense', 'transfer_out')\r\n    AND extract(year FROM t.transaction_date) = year_param\r\n    AND extract(month FROM t.transaction_date) = month_param;\r\n$function$\n",
+      "name": "get_deducted_money"
+    },
+    {
+      "definition": "CREATE OR REPLACE FUNCTION public.log_audit_event()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n  v_old jsonb;\r\n  v_new jsonb;\r\nBEGIN\r\n  IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN\r\n    v_old := to_jsonb(OLD);\r\n  END IF;\r\n  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN\r\n    v_new := to_jsonb(NEW);\r\n  END IF;\r\n\r\n  INSERT INTO public.audit_logs\r\n    (user_id, action, entity_type, entity_id, old_data, new_data)\r\n  VALUES\r\n    (auth.uid(),\r\n     COALESCE(TG_ARGV[0], TG_OP),\r\n     TG_TABLE_NAME,\r\n     CASE WHEN TG_OP = 'DELETE' THEN (v_old ->> 'id')::uuid\r\n          ELSE (v_new ->> 'id')::uuid END,\r\n     v_old,\r\n     v_new);\r\n\r\n  IF TG_OP = 'DELETE' THEN\r\n    RETURN OLD;\r\n  END IF;\r\n  RETURN NEW;\r\nEND;\r\n$function$\n",
+      "name": "log_audit_event"
+    }
+  ],
+  "policies": [
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Anyone can view active banks",
+      "table": "banks",
+      "using": "(is_active = true)"
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Anyone can view active patterns",
+      "table": "bank_sms_patterns",
+      "using": "(is_active = true)"
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Badges: SELECT",
+      "table": "badges",
+      "using": "true"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Users can delete their own profile",
+      "table": "profiles",
+      "using": "(auth.uid() = id)"
+    },
+    {
+      "check": "(auth.uid() = id)",
+      "command": "INSERT",
+      "policy": "Users can insert their own profile",
+      "table": "profiles",
+      "using": null
+    },
+    {
+      "check": "(auth.uid() = id)",
+      "command": "UPDATE",
+      "policy": "Users can update their own profile",
+      "table": "profiles",
+      "using": "(auth.uid() = id)"
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Users can view their own profile",
+      "table": "profiles",
+      "using": "(auth.uid() = id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Delete own categories",
+      "table": "categories",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "Insert own categories",
+      "table": "categories",
+      "using": null
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "Update own categories",
+      "table": "categories",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "View system + own categories",
+      "table": "categories",
+      "using": "((user_id IS NULL) OR (auth.uid() = user_id))"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "merchants: DELETE",
+      "table": "merchants",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "merchants: INSERT",
+      "table": "merchants",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "merchants: SELECT",
+      "table": "merchants",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "merchants: UPDATE",
+      "table": "merchants",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Items: DELETE",
+      "table": "items",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "Items: INSERT",
+      "table": "items",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Items: SELECT",
+      "table": "items",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "UPDATE",
+      "policy": "Items: UPDATE",
+      "table": "items",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Item price history: DELETE",
+      "table": "item_price_history",
+      "using": "(EXISTS ( SELECT 1\n   FROM items i\n  WHERE ((i.id = item_price_history.item_id) AND (i.user_id = auth.uid()))))"
+    },
+    {
+      "check": "(EXISTS ( SELECT 1\n   FROM items i\n  WHERE ((i.id = item_price_history.item_id) AND (i.user_id = auth.uid()))))",
+      "command": "INSERT",
+      "policy": "Item price history: INSERT",
+      "table": "item_price_history",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Item price history: SELECT",
+      "table": "item_price_history",
+      "using": "(EXISTS ( SELECT 1\n   FROM items i\n  WHERE ((i.id = item_price_history.item_id) AND (i.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "UPDATE",
+      "policy": "Item price history: UPDATE",
+      "table": "item_price_history",
+      "using": "(EXISTS ( SELECT 1\n   FROM items i\n  WHERE ((i.id = item_price_history.item_id) AND (i.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "cash_wallets: DELETE",
+      "table": "cash_wallets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "cash_wallets: INSERT",
+      "table": "cash_wallets",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "cash_wallets: SELECT",
+      "table": "cash_wallets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "cash_wallets: UPDATE",
+      "table": "cash_wallets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "cash_movements: DELETE",
+      "table": "cash_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "cash_movements: INSERT",
+      "table": "cash_movements",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "cash_movements: SELECT",
+      "table": "cash_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "cash_movements: UPDATE",
+      "table": "cash_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "detected_cards: DELETE",
+      "table": "detected_cards",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "detected_cards: INSERT",
+      "table": "detected_cards",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "detected_cards: SELECT",
+      "table": "detected_cards",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "detected_cards: UPDATE",
+      "table": "detected_cards",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "transactions: DELETE",
+      "table": "transactions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "transactions: INSERT",
+      "table": "transactions",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "transactions: SELECT",
+      "table": "transactions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "transactions: UPDATE",
+      "table": "transactions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "sms_messages: DELETE",
+      "table": "sms_messages",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "sms_messages: INSERT",
+      "table": "sms_messages",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "sms_messages: SELECT",
+      "table": "sms_messages",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "sms_messages: UPDATE",
+      "table": "sms_messages",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "monthly_incomes: DELETE",
+      "table": "monthly_incomes",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "monthly_incomes: INSERT",
+      "table": "monthly_incomes",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "monthly_incomes: SELECT",
+      "table": "monthly_incomes",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "monthly_incomes: UPDATE",
+      "table": "monthly_incomes",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "user_bank_accounts: DELETE",
+      "table": "user_bank_accounts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "user_bank_accounts: INSERT",
+      "table": "user_bank_accounts",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "user_bank_accounts: SELECT",
+      "table": "user_bank_accounts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "user_bank_accounts: UPDATE",
+      "table": "user_bank_accounts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "user_bank_movements: DELETE",
+      "table": "user_bank_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "user_bank_movements: INSERT",
+      "table": "user_bank_movements",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "user_bank_movements: SELECT",
+      "table": "user_bank_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "user_bank_movements: UPDATE",
+      "table": "user_bank_movements",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "expenses: DELETE",
+      "table": "expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "expenses: INSERT",
+      "table": "expenses",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "expenses: SELECT",
+      "table": "expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "expenses: UPDATE",
+      "table": "expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Expense items: DELETE",
+      "table": "expense_items",
+      "using": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_items.expense_id) AND (e.user_id = auth.uid()))))"
+    },
+    {
+      "check": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_items.expense_id) AND (e.user_id = auth.uid()))))",
+      "command": "INSERT",
+      "policy": "Expense items: INSERT",
+      "table": "expense_items",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Expense items: SELECT",
+      "table": "expense_items",
+      "using": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_items.expense_id) AND (e.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "UPDATE",
+      "policy": "Expense items: UPDATE",
+      "table": "expense_items",
+      "using": "(EXISTS ( SELECT 1\n   FROM expenses e\n  WHERE ((e.id = expense_items.expense_id) AND (e.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "item_usage: DELETE",
+      "table": "item_usage",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "item_usage: INSERT",
+      "table": "item_usage",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "item_usage: SELECT",
+      "table": "item_usage",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "item_usage: UPDATE",
+      "table": "item_usage",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "budgets: DELETE",
+      "table": "budgets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "budgets: INSERT",
+      "table": "budgets",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "budgets: SELECT",
+      "table": "budgets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "budgets: UPDATE",
+      "table": "budgets",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "Budget categories: DELETE",
+      "table": "budget_categories",
+      "using": "(EXISTS ( SELECT 1\n   FROM budgets b\n  WHERE ((b.id = budget_categories.budget_id) AND (b.user_id = auth.uid()))))"
+    },
+    {
+      "check": "(EXISTS ( SELECT 1\n   FROM budgets b\n  WHERE ((b.id = budget_categories.budget_id) AND (b.user_id = auth.uid()))))",
+      "command": "INSERT",
+      "policy": "Budget categories: INSERT",
+      "table": "budget_categories",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Budget categories: SELECT",
+      "table": "budget_categories",
+      "using": "(EXISTS ( SELECT 1\n   FROM budgets b\n  WHERE ((b.id = budget_categories.budget_id) AND (b.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "UPDATE",
+      "policy": "Budget categories: UPDATE",
+      "table": "budget_categories",
+      "using": "(EXISTS ( SELECT 1\n   FROM budgets b\n  WHERE ((b.id = budget_categories.budget_id) AND (b.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "recurring_expenses: DELETE",
+      "table": "recurring_expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "recurring_expenses: INSERT",
+      "table": "recurring_expenses",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "recurring_expenses: SELECT",
+      "table": "recurring_expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "recurring_expenses: UPDATE",
+      "table": "recurring_expenses",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "recurring_expense_occurrences: DELETE",
+      "table": "recurring_expense_occurrences",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "recurring_expense_occurrences: INSERT",
+      "table": "recurring_expense_occurrences",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "recurring_expense_occurrences: SELECT",
+      "table": "recurring_expense_occurrences",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "recurring_expense_occurrences: UPDATE",
+      "table": "recurring_expense_occurrences",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "saving_goals: DELETE",
+      "table": "saving_goals",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "saving_goals: INSERT",
+      "table": "saving_goals",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "saving_goals: SELECT",
+      "table": "saving_goals",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "saving_goals: UPDATE",
+      "table": "saving_goals",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "saving_recommendations: DELETE",
+      "table": "saving_recommendations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "saving_recommendations: INSERT",
+      "table": "saving_recommendations",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "saving_recommendations: SELECT",
+      "table": "saving_recommendations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "saving_recommendations: UPDATE",
+      "table": "saving_recommendations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "alerts: DELETE",
+      "table": "alerts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "alerts: INSERT",
+      "table": "alerts",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "alerts: SELECT",
+      "table": "alerts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "alerts: UPDATE",
+      "table": "alerts",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "notifications: DELETE",
+      "table": "notifications",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "notifications: INSERT",
+      "table": "notifications",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "notifications: SELECT",
+      "table": "notifications",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "notifications: UPDATE",
+      "table": "notifications",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "monthly_reports: DELETE",
+      "table": "monthly_reports",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "monthly_reports: INSERT",
+      "table": "monthly_reports",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "monthly_reports: SELECT",
+      "table": "monthly_reports",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "monthly_reports: UPDATE",
+      "table": "monthly_reports",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "monthly_item_statistics: DELETE",
+      "table": "monthly_item_statistics",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "monthly_item_statistics: INSERT",
+      "table": "monthly_item_statistics",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "monthly_item_statistics: SELECT",
+      "table": "monthly_item_statistics",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "monthly_item_statistics: UPDATE",
+      "table": "monthly_item_statistics",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "user_badges: DELETE",
+      "table": "user_badges",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "user_badges: INSERT",
+      "table": "user_badges",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "user_badges: SELECT",
+      "table": "user_badges",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "user_badges: UPDATE",
+      "table": "user_badges",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "Audit logs: SELECT",
+      "table": "audit_logs",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "ai_conversations: DELETE",
+      "table": "ai_conversations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "ai_conversations: INSERT",
+      "table": "ai_conversations",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "ai_conversations: SELECT",
+      "table": "ai_conversations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "ai_conversations: UPDATE",
+      "table": "ai_conversations",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "AI messages: DELETE",
+      "table": "ai_messages",
+      "using": "(EXISTS ( SELECT 1\n   FROM ai_conversations c\n  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))"
+    },
+    {
+      "check": "((auth.uid() = user_id) AND (EXISTS ( SELECT 1\n   FROM ai_conversations c\n  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid())))))",
+      "command": "INSERT",
+      "policy": "AI messages: INSERT",
+      "table": "ai_messages",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "AI messages: SELECT",
+      "table": "ai_messages",
+      "using": "(EXISTS ( SELECT 1\n   FROM ai_conversations c\n  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "UPDATE",
+      "policy": "AI messages: UPDATE",
+      "table": "ai_messages",
+      "using": "(EXISTS ( SELECT 1\n   FROM ai_conversations c\n  WHERE ((c.id = ai_messages.conversation_id) AND (c.user_id = auth.uid()))))"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "ai_actions: DELETE",
+      "table": "ai_actions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "ai_actions: INSERT",
+      "table": "ai_actions",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "ai_actions: SELECT",
+      "table": "ai_actions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "ai_actions: UPDATE",
+      "table": "ai_actions",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": null,
+      "command": "DELETE",
+      "policy": "sync_queue: DELETE",
+      "table": "sync_queue",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "INSERT",
+      "policy": "sync_queue: INSERT",
+      "table": "sync_queue",
+      "using": null
+    },
+    {
+      "check": null,
+      "command": "SELECT",
+      "policy": "sync_queue: SELECT",
+      "table": "sync_queue",
+      "using": "(auth.uid() = user_id)"
+    },
+    {
+      "check": "(auth.uid() = user_id)",
+      "command": "UPDATE",
+      "policy": "sync_queue: UPDATE",
+      "table": "sync_queue",
+      "using": "(auth.uid() = user_id)"
+    }
+  ],
+  "rls": [
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "banks"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "bank_sms_patterns"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "badges"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "profiles"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "categories"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "merchants"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "items"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "item_price_history"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "cash_wallets"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "cash_movements"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "detected_cards"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "transactions"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "sms_messages"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "monthly_incomes"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "user_bank_accounts"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "user_bank_movements"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "expenses"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "expense_items"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "item_usage"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "budgets"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "budget_categories"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "recurring_expenses"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "recurring_expense_occurrences"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "saving_goals"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "saving_recommendations"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "alerts"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "notifications"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "monthly_reports"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "monthly_item_statistics"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "user_badges"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "audit_logs"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "ai_conversations"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "ai_messages"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "ai_actions"
+    },
+    {
+      "enabled": true,
+      "forced": false,
+      "table": "sync_queue"
+    }
+  ],
+  "triggers": [
+    {
+      "definition": "CREATE TRIGGER banks_updated_at BEFORE UPDATE ON public.banks FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "banks"
+    },
+    {
+      "definition": "CREATE TRIGGER profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "profiles"
+    },
+    {
+      "definition": "CREATE TRIGGER bank_sms_patterns_updated_at BEFORE UPDATE ON public.bank_sms_patterns FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "bank_sms_patterns"
+    },
+    {
+      "definition": "CREATE TRIGGER categories_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "categories"
+    },
+    {
+      "definition": "CREATE TRIGGER merchants_updated_at BEFORE UPDATE ON public.merchants FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "merchants"
+    },
+    {
+      "definition": "CREATE TRIGGER items_updated_at BEFORE UPDATE ON public.items FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "items"
+    },
+    {
+      "definition": "CREATE TRIGGER item_price_history_updated_at BEFORE UPDATE ON public.item_price_history FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "item_price_history"
+    },
+    {
+      "definition": "CREATE TRIGGER cash_wallets_updated_at BEFORE UPDATE ON public.cash_wallets FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "cash_wallets"
+    },
+    {
+      "definition": "CREATE TRIGGER cash_movements_updated_at BEFORE UPDATE ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "cash_movements"
+    },
+    {
+      "definition": "CREATE TRIGGER detected_cards_updated_at BEFORE UPDATE ON public.detected_cards FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "detected_cards"
+    },
+    {
+      "definition": "CREATE TRIGGER transactions_updated_at BEFORE UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "transactions"
+    },
+    {
+      "definition": "CREATE TRIGGER expenses_updated_at BEFORE UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "expenses"
+    },
+    {
+      "definition": "CREATE TRIGGER recurring_expenses_updated_at BEFORE UPDATE ON public.recurring_expenses FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "recurring_expenses"
+    },
+    {
+      "definition": "CREATE TRIGGER budgets_updated_at BEFORE UPDATE ON public.budgets FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "budgets"
+    },
+    {
+      "definition": "CREATE TRIGGER budget_categories_updated_at BEFORE UPDATE ON public.budget_categories FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "budget_categories"
+    },
+    {
+      "definition": "CREATE TRIGGER saving_goals_updated_at BEFORE UPDATE ON public.saving_goals FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "saving_goals"
+    },
+    {
+      "definition": "CREATE TRIGGER saving_recommendations_updated_at BEFORE UPDATE ON public.saving_recommendations FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "saving_recommendations"
+    },
+    {
+      "definition": "CREATE TRIGGER monthly_reports_updated_at BEFORE UPDATE ON public.monthly_reports FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "monthly_reports"
+    },
+    {
+      "definition": "CREATE TRIGGER monthly_item_statistics_updated_at BEFORE UPDATE ON public.monthly_item_statistics FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "monthly_item_statistics"
+    },
+    {
+      "definition": "CREATE TRIGGER ai_conversations_updated_at BEFORE UPDATE ON public.ai_conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "ai_conversations"
+    },
+    {
+      "definition": "CREATE TRIGGER sync_queue_updated_at BEFORE UPDATE ON public.sync_queue FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "sync_queue"
+    },
+    {
+      "definition": "CREATE TRIGGER monthly_incomes_updated_at BEFORE UPDATE ON public.monthly_incomes FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "monthly_incomes"
+    },
+    {
+      "definition": "CREATE TRIGGER user_bank_accounts_updated_at BEFORE UPDATE ON public.user_bank_accounts FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+      "schema": "public",
+      "table": "user_bank_accounts"
+    },
+    {
+      "definition": "CREATE TRIGGER audit_transactions AFTER INSERT OR DELETE OR UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION log_audit_event('transactions_modified')",
+      "schema": "public",
+      "table": "transactions"
+    },
+    {
+      "definition": "CREATE TRIGGER audit_expenses AFTER INSERT OR DELETE OR UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION log_audit_event('expenses_modified')",
+      "schema": "public",
+      "table": "expenses"
+    },
+    {
+      "definition": "CREATE TRIGGER audit_cash_movements AFTER INSERT OR DELETE OR UPDATE ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION log_audit_event('cash_movements_modified')",
+      "schema": "public",
+      "table": "cash_movements"
+    },
+    {
+      "definition": "CREATE TRIGGER audit_budgets AFTER INSERT OR DELETE OR UPDATE ON public.budgets FOR EACH ROW EXECUTE FUNCTION log_audit_event('budgets_modified')",
+      "schema": "public",
+      "table": "budgets"
+    },
+    {
+      "definition": "CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()",
+      "schema": "auth",
+      "table": "users"
+    }
+  ],
+  "view_dependencies": null
+}

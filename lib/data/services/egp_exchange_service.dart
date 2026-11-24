@@ -13,12 +13,17 @@ class EgpConversion {
 /// Missing rates stay reviewable; a foreign amount is never treated as EGP.
 class EgpExchangeService {
   final http.Client? client;
-  EgpExchangeService({this.client});
+  final bool allowNetwork;
+  EgpExchangeService({this.client, this.allowNetwork = false});
 
   Future<EgpConversion?> convert(
-      int amountMinor, String currency, DateTime date) async {
+    int amountMinor,
+    String currency,
+    DateTime date,
+  ) async {
     if (currency == 'EGP') return EgpConversion(amountMinor, 1, '');
-    final day = '${date.year.toString().padLeft(4, '0')}-'
+    final day =
+        '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
     final key = 'floosy_fx_${currency}_$day';
@@ -29,10 +34,15 @@ class EgpExchangeService {
       if (cached != null) {
         rows = jsonDecode(cached);
       } else {
-        final uri = Uri.https('api.frankfurter.dev', '/v2/rates',
-            {'base': currency, 'quotes': 'EGP', 'date': day});
-        final response = await (client?.get(uri) ?? http.get(uri))
-            .timeout(const Duration(seconds: 6));
+        if (!allowNetwork) return null;
+        final uri = Uri.https('api.frankfurter.dev', '/v2/rates', {
+          'base': currency,
+          'quotes': 'EGP',
+          'date': day,
+        });
+        final response = await (client?.get(uri) ?? http.get(uri)).timeout(
+          const Duration(seconds: 6),
+        );
         if (response.statusCode != 200) return null;
         rows = jsonDecode(response.body);
       }
@@ -52,7 +62,10 @@ class EgpExchangeService {
       }
       await prefs.setString(key, jsonEncode(rows));
       return EgpConversion(
-          (amountMinor * rate).round(), rate, row['date'] as String);
+        (amountMinor * rate).round(),
+        rate,
+        row['date'] as String,
+      );
     } catch (_) {
       return null;
     }

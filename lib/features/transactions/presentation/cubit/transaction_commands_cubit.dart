@@ -5,13 +5,17 @@ import '../../../../domain/entities/card_resolution_result.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/entities/transaction_model.dart';
 import '../../../../domain/repositories/transaction_repository.dart';
+import '../../../../domain/entities/transaction_edit_policy.dart';
 
 class TransactionCommandState {
   final int pending;
   final int revision;
   final Object? error;
-  const TransactionCommandState(
-      {this.pending = 0, this.revision = 0, this.error});
+  const TransactionCommandState({
+    this.pending = 0,
+    this.revision = 0,
+    this.error,
+  });
   bool get busy => pending > 0;
 }
 
@@ -30,43 +34,63 @@ class TransactionCommandsCubit extends Cubit<TransactionCommandState> {
 
   Future<T> _execute<T>(Future<T> Function() command) async {
     final epoch = _epoch;
-    emit(TransactionCommandState(
-        pending: state.pending + 1, revision: state.revision));
+    emit(
+      TransactionCommandState(
+        pending: state.pending + 1,
+        revision: state.revision,
+      ),
+    );
     try {
       final result = await command();
       if (epoch == _epoch) _onChanged();
       if (!isClosed && epoch == _epoch) {
-        emit(TransactionCommandState(
-            pending: state.pending - 1, revision: state.revision + 1));
+        emit(
+          TransactionCommandState(
+            pending: state.pending - 1,
+            revision: state.revision + 1,
+          ),
+        );
       }
       return result;
     } catch (error) {
       if (!isClosed && epoch == _epoch) {
-        emit(TransactionCommandState(
+        emit(
+          TransactionCommandState(
             pending: state.pending - 1,
             revision: state.revision,
-            error: error));
+            error: error,
+          ),
+        );
       }
       rethrow;
     }
   }
 
-  TransactionCommandsCubit(this._repository, this._userId, this._onChanged,
-      this._editor, this._delete, this._manual)
-      : super(const TransactionCommandState());
-  Future<void> createManual(
-      {required TransactionType type,
-      required int amountMinor,
-      required String currency,
-      String? note}) async {
+  TransactionCommandsCubit(
+    this._repository,
+    this._userId,
+    this._onChanged,
+    this._editor,
+    this._delete,
+    this._manual,
+  ) : super(const TransactionCommandState());
+  Future<void> createManual({
+    required TransactionType type,
+    required int amountMinor,
+    required String currency,
+    String? note,
+  }) async {
     final userId = _userId();
     if (userId == null) throw StateError('Sign in first');
-    await _execute(() => _manual(
+    await _execute(
+      () => _manual(
         userId: userId,
         type: type,
         amountMinor: amountMinor,
         currency: currency,
-        note: note));
+        note: note,
+      ),
+    );
   }
 
   Future<SmartResolutionResult?> saveEdit(TransactionEditDraft draft) async {
@@ -75,24 +99,31 @@ class TransactionCommandsCubit extends Cubit<TransactionCommandState> {
     return _execute(() => _editor(userId).save(draft));
   }
 
+  Future<TransactionEditPolicy> editPolicy(Transaction transaction) {
+    final user = _userId();
+    if (user == null) throw StateError('Sign in first');
+    return _editor(user).policy(transaction);
+  }
+
   Future<Transaction> createTransaction({
     required Transaction transaction,
   }) async {
     return _execute(
-        () => _repository.createTransaction(transaction: transaction));
+      () => _repository.createTransaction(transaction: transaction),
+    );
   }
 
   Future<List<Transaction>> getTransactions({
     required String userId,
     bool syncWithRemote = true,
     int limit = 100,
-  }) =>
-      _repository.getTransactions(
-          userId: userId, syncWithRemote: syncWithRemote, limit: limit);
+  }) => _repository.getTransactions(
+    userId: userId,
+    syncWithRemote: syncWithRemote,
+    limit: limit,
+  );
 
-  Future<void> deleteTransaction({
-    required String transactionId,
-  }) async {
+  Future<void> deleteTransaction({required String transactionId}) async {
     final userId = _userId();
     if (userId == null) return;
     await _execute(() => _delete(userId: userId, transactionId: transactionId));
@@ -104,11 +135,20 @@ class TransactionCommandsCubit extends Cubit<TransactionCommandState> {
     required DateTime? endDateTime,
     bool syncWithRemote = true,
     int limit = 100,
-  }) =>
-      _repository.getTransactionsByRange(
-          userId: userId,
-          startDateTime: startDateTime,
-          endDateTime: endDateTime,
-          syncWithRemote: syncWithRemote,
-          limit: limit);
+  }) => _repository.getTransactionsByRange(
+    userId: userId,
+    startDateTime: startDateTime,
+    endDateTime: endDateTime,
+    syncWithRemote: syncWithRemote,
+    limit: limit,
+  );
+
+  Future<Map<String, String>> bankNamesForTransactions(String userId) async {
+    final repository = _repository;
+    if (repository is TransactionBankIdentityRepository) {
+      return (repository as TransactionBankIdentityRepository)
+          .bankNamesForTransactions(userId);
+    }
+    return const {};
+  }
 }

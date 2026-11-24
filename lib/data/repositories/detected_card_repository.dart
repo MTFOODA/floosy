@@ -123,7 +123,18 @@ class DetectedCardRepository implements domain.DetectedCardRepository {
 
   @override
   Future<void> updateDetectedCard(DetectedCard card) async {
-    await remote?.upsertCard(card);
+    final cards = await local.getCards(card.userId);
+    final index = cards.indexWhere((value) => value.id == card.id);
+    if (index < 0) return;
+    cards[index] = card;
+    await local.saveCards(card.userId, cards);
+    final mirror = remote;
+    if (mirror == null) return;
+    try {
+      await mirror.upsertCard(card);
+    } catch (_) {
+      // The encrypted local card remains the source of truth.
+    }
   }
 
   @override

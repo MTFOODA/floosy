@@ -1,7 +1,13 @@
-/// Temporary validation baseline: midnight in Cairo on 22 October 2026.
-/// Override with --dart-define=SMS_IMPORT_START=<ISO-8601 instant>.
+/// Initial history starts at midnight on the first day of the device's month.
+/// Persist this once per account; later months must not discard an unread gap.
 class SmsImportConfig {
-  static DateTime get start =>
-      DateTime.parse(const String.fromEnvironment('SMS_IMPORT_START',
-          defaultValue: '2026-10-22T00:00:00+03:00'));
+  static DateTime get start => startFor(DateTime.now());
+
+  static DateTime startFor(DateTime now) {
+    const override = String.fromEnvironment('SMS_IMPORT_START');
+    if (override.isNotEmpty) return DateTime.parse(override);
+    return now.isUtc
+        ? DateTime.utc(now.year, now.month)
+        : DateTime(now.year, now.month);
+  }
 }

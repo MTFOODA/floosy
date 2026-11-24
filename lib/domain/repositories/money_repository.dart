@@ -43,6 +43,16 @@ abstract interface class MoneyRepository {
     String? note,
   });
 
+  /// Sets the visible, real balance of one debit card without inventing an
+  /// income/expense transaction. The opening baseline is adjusted so all
+  /// existing and future card transactions continue to apply normally.
+  Future<void> setCurrentBalanceForCard({
+    required String userId,
+    required String cardLast4,
+    required int targetBalanceMinor,
+    String? bankName,
+  });
+
   Future<CardBalance> getCardBalance(
     String userId,
     String cardLast4, {

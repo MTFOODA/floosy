@@ -8,6 +8,7 @@ import '../../domain/entities/user_model.dart';
 import '../../core/utils/app_logger.dart';
 import 'sms_ingestion_service.dart';
 import 'sms_sync_state_store.dart';
+import '../../config/sms_import_config.dart';
 
 /// Central bank/wallet SMS synchronization.
 ///
@@ -17,8 +18,8 @@ import 'sms_sync_state_store.dart';
 ///
 /// INGESTION MODEL (first scan vs. incremental — the core contract):
 ///
-///   * FIRST EVER SCAN — a bounded backward walk over the WHOLE available
-///     inbox history. One page ([historyPageSize]) per scan, newest → oldest,
+///   * FIRST EVER SCAN — a bounded backward walk from the account's saved
+///     month boundary. One page ([historyPageSize]) per scan, newest → oldest,
 ///     so a huge inbox is ingested across several cycles and never blocks the
 ///     main isolate in one pass. When a page comes back short the walk is
 ///     complete and [SmsSyncState.historyComplete] is persisted.
@@ -29,12 +30,22 @@ import 'sms_sync_state_store.dart';
 ///     (`pendingSince`) before the cursor advances past it, so no message can
 ///     be skipped.
 ///
-/// There is NO date cutoff (the old "September 1, 2026" constant is gone) and
-/// NO display-range coupling: which SMS are ingested is decided ONLY by the
-/// processed-SMS ledger + this persisted cursor. The Transactions page display
-/// filter never calls into this service.
+/// The initial month boundary and cursor are independent of display filters.
+/// The processed-SMS ledger and transaction fingerprint prevent duplicates.
 class SmsPollingService extends WidgetsBindingObserver
-    implements SmsRepository {
+    implements SmsRepository, SmsMaintenanceRepository {
+  @override
+  Future<void> waitForIdle() async {
+    try {
+      await _activeWork;
+    } catch (_) {
+      /* Wait for settlement, including failure. */
+    }
+  }
+
+  @override
+  void resetMemory() => _stateCache.clear();
+
   /// Automatic check interval for newly arrived bank/wallet SMS.
   static const Duration interval = Duration(seconds: 5);
 
@@ -54,7 +65,10 @@ class SmsPollingService extends WidgetsBindingObserver
   static const Duration incrementalOverlap = Duration(minutes: 2);
 
   /// Messages inspected per historical page (bounded work per scan).
-  static const int historyPageSize = 200;
+  // A small page keeps the Flutter main isolate responsive on phones with a
+  // busy SMS inbox. The poller continues the month-start walk on later ticks,
+  // so this is a throughput trade-off, not a data-loss limit.
+  static const int historyPageSize = 50;
 
   /// Messages inspected per incremental scan.
   static const int incrementalPageSize = 50;
@@ -115,8 +129,8 @@ class SmsPollingService extends WidgetsBindingObserver
     this.processedSmsLocalDataSource,
     this.onTransactionsCreated,
     Duration? scanTimeout,
-  })  : syncStateStore = syncStateStore ?? SmsSyncStateStore(),
-        scanTimeout = scanTimeout ?? defaultScanTimeout;
+  }) : syncStateStore = syncStateStore ?? SmsSyncStateStore(),
+       scanTimeout = scanTimeout ?? defaultScanTimeout;
 
   /// Number of scans this service completed (diagnostics/tests).
   int get scansCompleted => _scansCompleted;
@@ -134,6 +148,8 @@ class SmsPollingService extends WidgetsBindingObserver
   void start() {
     if (_started) return;
     _started = true;
+    _resumed =
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.paused;
     WidgetsBinding.instance.addObserver(this);
     _timer = Timer.periodic(interval, (_) => _tick());
     logInfo('SMS_POLLING_START interval=${interval.inSeconds}s');
@@ -167,9 +183,11 @@ class SmsPollingService extends WidgetsBindingObserver
       logInfo('SMS_POLLING_PAUSED');
     } else if (state == AppLifecycleState.resumed) {
       _resumed = true;
+      if (!_started) return;
       _timer?.cancel();
       _timer = Timer.periodic(interval, (_) => _tick());
       logInfo('SMS_POLLING_RESUMED');
+      unawaited(_tick());
     }
   }
 
@@ -179,12 +197,12 @@ class SmsPollingService extends WidgetsBindingObserver
   /// one-time historical walk, so a pull-to-refresh can never trigger a
   /// historical re-read.
   Future<void> _tick() async {
-    if (!_resumed) return;
-    if (_inflight != null) return;
+    if (!_started || !_resumed) return;
+    if (_inflight != null || _activeWork != null) return;
     final userId = await resolveUserId();
-    if (userId == null) return;
+    if (userId == null || !_started || !_resumed) return;
     // Re-check after the async gap: a manual scan may have started meanwhile.
-    if (_inflight != null) return;
+    if (_inflight != null || _activeWork != null) return;
     try {
       await _runScan(userId: userId, allowWalk: true, origin: 'POLL');
     } catch (e) {
@@ -241,8 +259,10 @@ class SmsPollingService extends WidgetsBindingObserver
     // timeout result instead; the real scan's side effects (DB writes, cursor,
     // UI callbacks) still land when it completes.
     if (_activeWork != null) {
-      logInfo('SMS_SCAN_ACTIVE_WORK_BUSY requestedWalk=$fullScan '
-          'no duplicate pipeline started');
+      logInfo(
+        'SMS_SCAN_ACTIVE_WORK_BUSY requestedWalk=$fullScan '
+        'no duplicate pipeline started',
+      );
       return _empty(errors: 1);
     }
     final claimant = _inflight;
@@ -290,31 +310,41 @@ class SmsPollingService extends WidgetsBindingObserver
     final completer = Completer<SmsIngestionResult>();
     final claim = completer.future;
     _inflight = claim;
-    final work =
-        _performScan(userId: userId, allowWalk: allowWalk, origin: origin);
+    final work = _performScan(
+      userId: userId,
+      allowWalk: allowWalk,
+      origin: origin,
+    );
     _activeWork = work;
-    unawaited(work.whenComplete(() {
-      if (identical(_activeWork, work)) _activeWork = null;
-    }));
-    work.timeout(
-      scanTimeout,
-      onTimeout: () {
-        // A timeout is NOT a definitive failure: Dart futures are not
-        // cancellable, so this page keeps running in the background.
-        // Remember the claim so a JOINER returns its result instead of
-        // starting a second ingestion pipeline on top of the running one.
-        _timedOutClaim = claim;
-        logError(
-          'SMS_SCAN_TIMEOUT exceeded ${scanTimeout.inSeconds}s origin=$origin',
-          'timeout',
+    unawaited(
+      work.whenComplete(() {
+        if (identical(_activeWork, work)) _activeWork = null;
+      }),
+    );
+    work
+        .timeout(
+          scanTimeout,
+          onTimeout: () {
+            // A timeout is NOT a definitive failure: Dart futures are not
+            // cancellable, so this page keeps running in the background.
+            // Remember the claim so a JOINER returns its result instead of
+            // starting a second ingestion pipeline on top of the running one.
+            _timedOutClaim = claim;
+            logError(
+              'SMS_SCAN_TIMEOUT exceeded ${scanTimeout.inSeconds}s origin=$origin',
+              'timeout',
+            );
+            return _empty(errors: 1);
+          },
+        )
+        .then(
+          (result) {
+            if (!completer.isCompleted) completer.complete(result);
+          },
+          onError: (Object e, StackTrace st) {
+            if (!completer.isCompleted) completer.completeError(e, st);
+          },
         );
-        return _empty(errors: 1);
-      },
-    ).then((result) {
-      if (!completer.isCompleted) completer.complete(result);
-    }, onError: (Object e, StackTrace st) {
-      if (!completer.isCompleted) completer.completeError(e, st);
-    });
     // The claim slot releases when the CLAIM settles (timeout or result) so
     // waiting callers are never stuck; [_activeWork] keeps guarding the real
     // work underneath until it truly finishes.
@@ -373,15 +403,15 @@ class SmsPollingService extends WidgetsBindingObserver
     final isFirstScan = !state.historyComplete;
     final tag = isFirstScan ? 'SMS_FIRST_SCAN' : 'SMS_BACKFILL';
     final before = state.walkCursor;
-    // The FIRST walk must reach the OLDEST message in the inbox, so it is never
-    // bounded below by a backlog floor: a floor registered by a concurrent
-    // incremental scan would cut the page short, look like "history complete",
-    // and silently abandon everything older than that floor.
-    final since = isFirstScan ? null : state.pendingSince;
+    // Historical pages share the account's persisted month boundary. An
+    // incremental backlog must never raise that boundary while history runs.
+    final since = isFirstScan ? state.firstAllowedAt : state.pendingSince;
     final startedAt = DateTime.now();
-    logInfo('$tag origin=$origin page=${state.pagesScanned + 1} '
-        'since=${since?.toIso8601String()} before=${before?.toIso8601String()} '
-        'max=$historyPageSize');
+    logInfo(
+      '$tag origin=$origin page=${state.pagesScanned + 1} '
+      'since=${since?.toIso8601String()} before=${before?.toIso8601String()} '
+      'max=$historyPageSize',
+    );
 
     final page = await ingestion.scanAndProcess(
       userId: userId,
@@ -392,11 +422,13 @@ class SmsPollingService extends WidgetsBindingObserver
     );
 
     final oldest = page.oldestSeenOnPage;
-    // A short page means the walk reached its lower bound. An EMPTY page never
-    // completes the walk: it also covers "no permission yet" / "read failed",
-    // and the next cycle simply retries instead of permanently skipping the
-    // whole history.
-    var reachedLowerBound = page.scanned > 0 && page.scanned < historyPageSize;
+    // A successful short/empty read completes history. Permission and query
+    // failures carry errors and keep the cursor so the same page is retried.
+    if (page.errors > 0) {
+      await _commit(userId, state, page, startedAt, tag);
+      return page;
+    }
+    final reachedLowerBound = page.scanned < historyPageSize;
     // TIE-SAFE BOUNDARY: the native bound is INCLUSIVE (`DATE <= until`), so the
     // next page starts AT the oldest timestamp of this page instead of 1 ms
     // BELOW it. Messages that share one timestamp and did not fit into this
@@ -427,7 +459,7 @@ class SmsPollingService extends WidgetsBindingObserver
     final next = isFirstScan
         ? state.copyWith(
             historyComplete: reachedLowerBound,
-            // The first walk covers the WHOLE inbox, so any backlog floor is
+            // The first walk covers the permitted history, so a backlog floor is
             // obsolete once it completes.
             clearPendingSince: reachedLowerBound,
             walkCursor: nextCursor,
@@ -445,8 +477,10 @@ class SmsPollingService extends WidgetsBindingObserver
             updatedAt: DateTime.now(),
           );
 
-    logInfo('$tag ${reachedLowerBound ? "LOWER_BOUND_REACHED" : "PAGE_DONE"} '
-        'walked=${page.scanned} created=${page.transactionsCreated}');
+    logInfo(
+      '$tag ${reachedLowerBound ? "LOWER_BOUND_REACHED" : "PAGE_DONE"} '
+      'walked=${page.scanned} created=${page.transactionsCreated}',
+    );
     await _commit(userId, next, page, startedAt, tag);
     return page;
   }
@@ -466,14 +500,21 @@ class SmsPollingService extends WidgetsBindingObserver
   }) async {
     final since = state.incrementalSince(incrementalOverlap);
     final startedAt = DateTime.now();
-    logInfo('SMS_INCREMENTAL origin=$origin since=${since?.toIso8601String()} '
-        'max=$incrementalPageSize');
+    logInfo(
+      'SMS_INCREMENTAL origin=$origin since=${since?.toIso8601String()} '
+      'max=$incrementalPageSize',
+    );
     final page = await ingestion.scanAndProcess(
       userId: userId,
       knownBanks: banks,
       maxMessages: incrementalPageSize,
       since: since,
     );
+
+    if (page.errors > 0) {
+      await _commit(userId, state, page, startedAt, 'SMS_INCREMENTAL');
+      return page;
+    }
 
     final pageFull = page.scanned >= incrementalPageSize;
     final newest = _maxDate(state.lastProcessedAt, page.newestSeenOnPage);
@@ -500,8 +541,10 @@ class SmsPollingService extends WidgetsBindingObserver
         pagesScanned: state.pagesScanned + 1,
         updatedAt: DateTime.now(),
       );
-      logInfo('SMS_INCREMENTAL_BACKLOG_DETECTED pending_since='
-          '${floor.toIso8601String()} cursor=${cursor.toIso8601String()}');
+      logInfo(
+        'SMS_INCREMENTAL_BACKLOG_DETECTED pending_since='
+        '${floor.toIso8601String()} cursor=${cursor.toIso8601String()}',
+      );
     } else {
       next = state.copyWith(
         lastProcessedAt: newest,
@@ -525,16 +568,19 @@ class SmsPollingService extends WidgetsBindingObserver
     _stateCache[userId] = next;
     await syncStateStore.write(userId, next);
     _scansCompleted++;
-    logInfo('SMS_SCAN_APPLIED tag=$tag '
-        'mode=${next.historyComplete ? "incremental" : "walking"} '
-        'inspected=${page.scanned} eligible=${page.eligible} '
-        'new=${page.newlyProcessed} already=${page.alreadyProcessed} '
-        'nonBank=${page.skippedNonBank} parseFailures=${page.parseFailures} '
-        'errors=${page.errors} '
-        'duration_ms=${DateTime.now().difference(startedAt).inMilliseconds}');
+    logInfo(
+      'SMS_SCAN_APPLIED tag=$tag '
+      'mode=${next.historyComplete ? "incremental" : "walking"} '
+      'inspected=${page.scanned} eligible=${page.eligible} '
+      'new=${page.newlyProcessed} already=${page.alreadyProcessed} '
+      'nonBank=${page.skippedNonBank} parseFailures=${page.parseFailures} '
+      'errors=${page.errors} '
+      'duration_ms=${DateTime.now().difference(startedAt).inMilliseconds}',
+    );
     if (page.transactionsCreated > 0) {
       logInfo(
-          'SMS_NEW_TRANSACTIONS count=${page.transactionsCreated} tag=$tag');
+        'SMS_NEW_TRANSACTIONS count=${page.transactionsCreated} tag=$tag',
+      );
       onTransactionsCreated?.call(page.transactionsCreated);
     }
   }
@@ -545,6 +591,9 @@ class SmsPollingService extends WidgetsBindingObserver
   /// scratch (or a skip).
   Future<SmsSyncState> _loadState(String userId) async {
     var state = _stateCache[userId] ?? await syncStateStore.read(userId);
+    if (state.firstAllowedAt == null) {
+      state = state.copyWith(firstAllowedAt: SmsImportConfig.start.toUtc());
+    }
     // CLOCK / TIMESTAMP RECOVERY. A cursor that sits BEYOND the current clock
     // (device clock moved backwards, a sender timestamp in the future, a
     // restored backup with future dates) pushes every incremental window start
@@ -554,10 +603,15 @@ class SmsPollingService extends WidgetsBindingObserver
     // walk/backlog machinery re-covers any gap - no message is missed and no
     // transaction is duplicated.
     final wall = DateTime.now().add(incrementalOverlap);
+    if (state.firstAllowedAt != null && state.firstAllowedAt!.isAfter(wall)) {
+      state = state.copyWith(firstAllowedAt: DateTime.now());
+    }
     if (state.lastProcessedAt != null && state.lastProcessedAt!.isAfter(wall)) {
-      logWarning('SMS_CURSOR_BEYOND_CLOCK cursor='
-          '${state.lastProcessedAt!.toIso8601String()} '
-          'wall=${wall.toIso8601String()} -> cursor dropped');
+      logWarning(
+        'SMS_CURSOR_BEYOND_CLOCK cursor='
+        '${state.lastProcessedAt!.toIso8601String()} '
+        'wall=${wall.toIso8601String()} -> cursor dropped',
+      );
       state = state.copyWith(clearLastProcessedAt: true);
     }
     final ledgerNewest = await _ledgerLatest(userId);
@@ -606,9 +660,9 @@ class SmsPollingService extends WidgetsBindingObserver
   }
 
   static SmsIngestionResult _empty({int errors = 0}) => SmsIngestionResult(
-        scanned: 0,
-        transactionsCreated: 0,
-        duplicatesOrSkipped: 0,
-        errors: errors,
-      );
+    scanned: 0,
+    transactionsCreated: 0,
+    duplicatesOrSkipped: 0,
+    errors: errors,
+  );
 }

@@ -12,7 +12,7 @@ DateTime _dateTimeFromJsonRequired(dynamic value) =>
     DateTime.parse(value.toString()).toUtc();
 
 @freezed
-class Budget with _$Budget {
+abstract class Budget with _$Budget {
   const factory Budget({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -35,7 +35,7 @@ class Budget with _$Budget {
 }
 
 @freezed
-class BudgetCategory with _$BudgetCategory {
+abstract class BudgetCategory with _$BudgetCategory {
   const factory BudgetCategory({
     required String id,
     @JsonKey(name: 'budget_id') required String budgetId,
@@ -54,7 +54,7 @@ class BudgetCategory with _$BudgetCategory {
 enum RecurringFrequency { daily, weekly, monthly, yearly, custom }
 
 @freezed
-class RecurringExpense with _$RecurringExpense {
+abstract class RecurringExpense with _$RecurringExpense {
   const factory RecurringExpense({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -84,7 +84,7 @@ class RecurringExpense with _$RecurringExpense {
 enum RecurringOccurrenceStatus { pending, paid, skipped, cancelled }
 
 @freezed
-class RecurringExpenseOccurrence with _$RecurringExpenseOccurrence {
+abstract class RecurringExpenseOccurrence with _$RecurringExpenseOccurrence {
   const factory RecurringExpenseOccurrence({
     required String id,
     @JsonKey(name: 'recurring_expense_id') required String recurringExpenseId,
@@ -104,7 +104,7 @@ class RecurringExpenseOccurrence with _$RecurringExpenseOccurrence {
 }
 
 @freezed
-class SavingGoal with _$SavingGoal {
+abstract class SavingGoal with _$SavingGoal {
   const factory SavingGoal({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -128,7 +128,7 @@ class SavingGoal with _$SavingGoal {
 enum RecommendationStatus { active, completed, dismissed }
 
 @freezed
-class SavingRecommendation with _$SavingRecommendation {
+abstract class SavingRecommendation with _$SavingRecommendation {
   const factory SavingRecommendation({
     required String id,
     @JsonKey(name: 'user_id') required String userId,

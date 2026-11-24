@@ -1,4 +1,9 @@
+import '../../../../app/app_runtime.dart';
+import '../../../../domain/entities/item_model.dart' as item_entities;
+import '../widgets/transaction_edit_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../../../../core/services/sms_permission_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:floosy/features/dashboard/presentation/cubit/finance_cubit.dart';
@@ -14,8 +19,10 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../../../domain/entities/transaction_model.dart';
+import '../../../../domain/entities/bank_directory.dart';
+import '../../../../core/state/bank_catalog_cubit.dart';
+import '../../../../domain/services/card_ownership.dart';
 import '../../../../routing/app_routes.dart';
-import 'package:floosy/domain/usecases/save_transaction_edit.dart';
 import '../widgets/transaction_filter_sheet.dart';
 import '../widgets/transaction_filter_chips.dart';
 import '../widgets/transaction_widgets.dart';
@@ -48,6 +55,8 @@ class TransactionsScreen extends StatefulWidget {
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
   TransactionsListCubit? _controller;
+  Map<String, String> _bankIdentities = const {};
+  String? _bankIdentityOwner;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
@@ -77,15 +86,28 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           // the single-flight background sync below.
           syncWithRemote: false,
         );
-        logInfo('TRANSACTIONS_QUERY elapsed_ms='
-            '${DateTime.now().difference(sw).inMilliseconds} count=${rows.length}');
+        final identities = await transactions.bankNamesForTransactions(userId);
+        if (mounted && auth.state.userId == userId) {
+          _bankIdentities = identities;
+          _bankIdentityOwner = userId;
+        }
+        logInfo(
+          'TRANSACTIONS_QUERY elapsed_ms='
+          '${DateTime.now().difference(sw).inMilliseconds} count=${rows.length}',
+        );
         return rows;
       },
       runSmsSync: () async {
         final userId = auth.state.userId;
         if (userId == null) return;
-        // NEW SMS ONLY. `scanNow()` never performs a historical full read.
-        final result = await sms.scanNow();
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          if (!mounted ||
+              !await SmsPermissionService.ensureSmsPermission(context)) {
+            return;
+          }
+        }
+        // Continue at most one bounded page of this account's month history.
+        final result = await sms.scanNow(fullScan: true);
         logInfo('TRANSACTIONS_REFRESH_SMS_SCAN result=$result');
       },
     );
@@ -130,10 +152,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     // Transactions that belong to no card yet. They are shown in the list (so
     // the user can act on them) but excluded from EVERY card's figures, and
     // they carry the red dot until the card association is resolved.
-    final unresolved =
-        context.watch<FinanceCubit>().state.map((data) => data.unassigned);
-    final unresolvedIds =
-        (unresolved.value ?? const <Transaction>[]).map((t) => t.id).toSet();
+    final unresolved = context.watch<FinanceCubit>().state.map(
+      (data) => data.unassigned,
+    );
+    final unresolvedIds = (unresolved.value ?? const <Transaction>[])
+        .map((t) => t.id)
+        .toSet();
 
     // New SMS-derived transactions were stored â†’ re-query the local list.
     // NO SMS scan happens here â€” the poller already finished its scan.
@@ -145,125 +169,148 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final filter = context.watch<TransactionFilterCubit>().state;
 
     return MultiBlocListener(
-        listeners: [
-          BlocListener<RefreshCubit, int>(
-              listener: (_, __) => _reloadForCurrentFilter()),
-          BlocListener<TransactionFilterCubit, TransactionDisplayFilter>(
-              listener: (_, __) => _reloadForCurrentFilter()),
-        ],
-        child: Scaffold(
-          backgroundColor: context.fc.background,
-          body: SafeArea(
-            // Pull-to-refresh: check for NEW SMS â†’ persist â†’ reload the stored
-            // list. Single-flight (controller-level) and NEW-messages-only
-            // (poller-level), so it can never re-read the historical inbox.
-            child: RefreshIndicator(
-              onRefresh: () {
-                context.read<FinanceCubit>().reload();
-                context.read<FinanceCubit>().reload();
-                return controller.refresh(
-                  start: filter.startDateTime,
-                  end: filter.endDateTime,
-                );
-              },
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: FloosyDesign.horizontalPadding(context)
-                          .copyWith(top: 16, bottom: 100),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(l['transactions'],
-                                  style: context.fc.pageTitle),
-                              const Spacer(),
-                              // DISPLAY FILTER (date/time range) â€” moved out of
-                              // Settings. Tapping opens a range selector that
-                              // ONLY changes what is visible.
-                              GestureDetector(
-                                onTap: _openFilterSheet,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
+      listeners: [
+        BlocListener<RefreshCubit, int>(
+          listener: (_, __) => _reloadForCurrentFilter(),
+        ),
+        BlocListener<TransactionFilterCubit, TransactionDisplayFilter>(
+          listener: (_, __) => _reloadForCurrentFilter(),
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: context.fc.background,
+        body: SafeArea(
+          // Pull-to-refresh: check for NEW SMS â†’ persist â†’ reload the stored
+          // list. Single-flight (controller-level) and NEW-messages-only
+          // (poller-level), so it can never re-read the historical inbox.
+          child: RefreshIndicator(
+            onRefresh: () {
+              context.read<FinanceCubit>().reload();
+              context.read<FinanceCubit>().reload();
+              return controller.refresh(
+                start: filter.startDateTime,
+                end: filter.endDateTime,
+              );
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: FloosyDesign.horizontalPadding(
+                      context,
+                    ).copyWith(top: 16, bottom: 100),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              l['transactions'],
+                              style: context.fc.pageTitle,
+                            ),
+                            const Spacer(),
+                            // DISPLAY FILTER (date/time range) â€” moved out of
+                            // Settings. Tapping opens a range selector that
+                            // ONLY changes what is visible.
+                            GestureDetector(
+                              onTap: _openFilterSheet,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: filter.isActive
+                                      ? FloosyDesign.primaryPurple
+                                      : context.fc.primarySurface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
                                     color: filter.isActive
                                         ? FloosyDesign.primaryPurple
-                                        : context.fc.primarySurface,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: filter.isActive
-                                            ? FloosyDesign.primaryPurple
-                                            : context.fc.borderSubtle),
-                                  ),
-                                  child: Icon(
-                                    Icons.filter_list_rounded,
-                                    size: 20,
-                                    color: filter.isActive
-                                        ? Colors.white
-                                        : context.fc.textSecondary,
+                                        : context.fc.borderSubtle,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              GestureDetector(
-                                onTap: () async {
-                                  logInfo('NAV_TARGET_ROUTE '
-                                      '${AppRoutes.addTransaction}');
-                                  await context.push(AppRoutes.addTransaction);
-                                  if (mounted) _reloadForCurrentFilter();
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                      gradient: FloosyDesign.purpleGradient,
-                                      borderRadius: BorderRadius.circular(14)),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.add_rounded,
-                                          color: Colors.white, size: 18),
-                                      const SizedBox(width: 4),
-                                      Text(l['add'],
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14)),
-                                    ],
-                                  ),
+                                child: Icon(
+                                  Icons.filter_list_rounded,
+                                  size: 20,
+                                  color: filter.isActive
+                                      ? Colors.white
+                                      : context.fc.textSecondary,
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSearchField(l),
-                          const SizedBox(height: 16),
-                          // Horizontally scrollable, content-width chips: long
-                          // labels ("Purchases", "Transfers Out", localized Arabic)
-                          // scroll instead of wrapping mid-word.
-                          TransactionChipRow(
-                            keys: TransactionChipLabels.keys,
-                            activeIndex: _activeFilterIndex,
-                            labelFor: _chipLabel,
-                            onSelect: _onChipSelected,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
+                            ),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () async {
+                                logInfo(
+                                  'NAV_TARGET_ROUTE '
+                                  '${AppRoutes.addTransaction}',
+                                );
+                                await context.push(AppRoutes.addTransaction);
+                                if (mounted) _reloadForCurrentFilter();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: FloosyDesign.purpleGradient,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.add_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      l['add'],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSearchField(l),
+                        const SizedBox(height: 16),
+                        // Horizontally scrollable, content-width chips: long
+                        // labels ("Purchases", "Transfers Out", localized Arabic)
+                        // scroll instead of wrapping mid-word.
+                        TransactionChipRow(
+                          keys: TransactionChipLabels.keys,
+                          activeIndex: _activeFilterIndex,
+                          labelFor: _chipLabel,
+                          onSelect: _onChipSelected,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                     ),
                   ),
-                  // List / loading / error / empty states live INSIDE the one
-                  // scrollable as slivers â€” no nested vertical scrollables.
-                  _buildTransactionList(
-                      context, l, controller, filter, unresolvedIds),
-                ],
-              ),
+                ),
+                // List / loading / error / empty states live INSIDE the one
+                // scrollable as slivers â€” no nested vertical scrollables.
+                _buildTransactionList(
+                  context,
+                  l,
+                  controller,
+                  filter,
+                  unresolvedIds,
+                ),
+              ],
             ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 
   /// Search field for the transaction list header.
@@ -287,8 +334,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ),
         filled: true,
         fillColor: context.fc.elevatedSurface.withValues(alpha: 0.6),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
       onChanged: (v) => setState(() => _searchQuery = v),
     );
@@ -311,6 +360,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Future<void> _openTransactionActions(Transaction transaction) async {
+    final l = AppLocalizations.s(context);
     final action = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
@@ -322,43 +372,48 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
                   color: sheetContext.fc.borderSubtle,
                   borderRadius: BorderRadius.circular(4),
-                )),
-            const SizedBox(height: 18),
-            ListTile(
-              leading: const Icon(Icons.receipt_long_rounded),
-              title: Text(transaction.merchantName ?? 'Transaction'),
-              subtitle: Text(
-                  '${transaction.amountMinor / 100} ${transaction.currency}'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit'),
-              onTap: () => Navigator.pop(sheetContext, 'edit'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.rule_folder_outlined),
-              title: const Text('Add / Complete information'),
-              onTap: () => Navigator.pop(sheetContext, 'complete'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () => Navigator.pop(sheetContext, 'delete'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.close),
-              title: const Text('Cancel'),
-              onTap: () => Navigator.pop(sheetContext),
-            ),
-          ]),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                leading: const Icon(Icons.receipt_long_rounded),
+                title: Text(
+                  transaction.merchantName ?? l['transactionDetails'],
+                ),
+                subtitle: Text(
+                  '${transaction.amountMinor / 100} ${l.currencySymbol(transaction.currency)}',
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.rule_folder_outlined),
+                title: Text(l['completeTransaction']),
+                onTap: () => Navigator.pop(sheetContext, 'complete'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  l['delete'],
+                  style: const TextStyle(color: Colors.red),
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'delete'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: Text(l['cancel']),
+                onTap: () => Navigator.pop(sheetContext),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -371,152 +426,65 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Future<void> _showTransactionEditor(Transaction transaction) async {
-    final amount = TextEditingController(
-        text: (transaction.amountMinor / 100).toStringAsFixed(2));
-    final currency = TextEditingController(text: transaction.currency);
-    final bank = TextEditingController(text: transaction.merchantName ?? '');
-    final card = TextEditingController(text: transaction.cardLast4 ?? '');
-    final category = TextEditingController(text: transaction.categoryId ?? '');
-    final merchant =
-        TextEditingController(text: transaction.merchantName ?? '');
-    var type = transaction.type;
-    var date = transaction.transactionDate;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Edit transaction'),
-          content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (transaction.status == TransactionStatus.pending)
-              Text(AppLocalizations.s(context)['fxPendingReview']),
-            if (transaction.notes != null) Text(transaction.notes!),
-            DropdownButtonFormField<TransactionType>(
-              initialValue: type,
-              items: TransactionType.values
-                  .map((value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(transactionTypeLabel(
-                            AppLocalizations.s(context), value)),
-                      ))
-                  .toList(),
-              onChanged: (value) => setState(() => type = value ?? type),
-            ),
-            TextField(
-                controller: amount,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Amount')),
-            TextField(
-                controller: currency,
-                decoration: const InputDecoration(labelText: 'Currency')),
-            TextField(
-                controller: bank,
-                decoration:
-                    const InputDecoration(labelText: 'Bank ID / bank name')),
-            TextField(
-                controller: card,
-                maxLength: 4,
-                decoration: const InputDecoration(labelText: 'Card last4')),
-            TextField(
-                controller: category,
-                decoration:
-                    const InputDecoration(labelText: 'Category ID (optional)')),
-            TextField(
-                controller: merchant,
-                decoration:
-                    const InputDecoration(labelText: 'Description / merchant')),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Transaction date'),
-              subtitle: Text(date.toLocal().toString()),
-              trailing: const Icon(Icons.calendar_month_outlined),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime.now().add(const Duration(days: 1)),
-                  initialDate: date,
-                );
-                if (picked != null) {
-                  setState(() => date = DateTime(picked.year, picked.month,
-                      picked.day, date.hour, date.minute));
-                }
-              },
-            ),
-          ])),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Save')),
-          ],
-        ),
-      ),
-    );
-    if (saved != true || !mounted) return;
-    final userId = context.read<AuthCubit>().state.userId;
-    if (userId == null) return;
-    final amountValue = double.tryParse(amount.text.replaceAll(',', '').trim());
-    if (amountValue == null || amountValue <= 0) return;
-
-    // The real save behaviour lives in [SaveTransactionEdit] so it is
-    // testable - this is the exact same code the regression tests exercise.
     final controller = context.read<TransactionCommandsCubit>();
+    final categoriesRepository = context
+        .read<AppRuntime>()
+        .repositories
+        .categories;
     try {
-      await controller.saveEdit(TransactionEditDraft(
-        transaction: transaction,
-        type: type,
-        amountMinor: (amountValue * 100).round(),
-        currency: currency.text.trim().isEmpty
-            ? transaction.currency
-            : currency.text.trim().toUpperCase(),
-        bankText: bank.text,
-        last4Text: card.text,
-        categoryId: category.text.trim().isEmpty ? null : category.text.trim(),
-        merchantName:
-            merchant.text.trim().isEmpty ? null : merchant.text.trim(),
-        transactionDate: date,
-      ));
-    } catch (e) {
-      logError('[EDIT] save failed txn=${transaction.id}', e);
+      final policy = await controller.editPolicy(transaction);
+      final List<item_entities.Category> categories =
+          await categoriesRepository?.getUserCategories(transaction.userId) ??
+          const [];
+      if (!mounted) return;
+      final saved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => TransactionEditDialog(
+          policy: policy,
+          categories: categories,
+          onSave: (draft) async {
+            await controller.saveEdit(draft);
+          },
+        ),
+      );
+      if (saved == true && mounted) _reloadForCurrentFilter();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.s(context)['errorLoading'])),
+        );
+      }
     }
-
-    if (!mounted) return;
-    // The refresh is UNCONDITIONAL and runs after the awaited save. Whatever
-    // happened above, the screen must re-read the transactions list and drop
-    // every derived provider so the committed row is what gets rendered.
-    _reloadForCurrentFilter();
   }
 
   Future<void> _confirmAndDeleteTransaction(Transaction transaction) async {
+    final l = AppLocalizations.s(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete transaction?'),
-        content: const Text(
-            'This removes the transaction from the application ledger. The original SMS remains recorded and will not be reprocessed.'),
+        title: Text(l['deleteTransactionTitle']),
+        content: Text(l['deleteTransactionBody']),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l['cancel']),
+          ),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Delete')),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l['delete']),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
     final userId = context.read<AuthCubit>().state.userId;
     if (userId == null) return;
-    await context
-        .read<TransactionCommandsCubit>()
-        .deleteTransaction(transactionId: transaction.id);
+    await context.read<TransactionCommandsCubit>().deleteTransaction(
+      transactionId: transaction.id,
+    );
     if (!mounted) return;
-    context.read<FinanceCubit>().reload();
     context.read<FinanceCubit>().reload();
     context.read<CardsCubit>().reload();
     context.read<RefreshCubit>().refresh();
@@ -529,7 +497,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       isScrollControlled: true,
       backgroundColor: context.fc.elevatedSurface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => const TransactionFilterSheet(),
     );
   }
@@ -554,8 +523,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         return Icons.south_west_rounded;
       case TransactionType.transfer_out:
         return Icons.north_east_rounded;
-      default:
-        return Icons.receipt_long_outlined;
+      case TransactionType.refund:
+      case TransactionType.reversal:
+        return Icons.undo_rounded;
+      case TransactionType.adjustment:
+        return Icons.tune_rounded;
     }
   }
 
@@ -601,6 +573,23 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     TransactionDisplayFilter filter,
     Set<String> unresolvedCardIds,
   ) {
+    final cards = context.watch<CardsCubit>().state.value ?? const [];
+    final banks = context.watch<BankCatalogCubit>().state.value ?? const [];
+    String? bankNameOf(Transaction transaction) {
+      if (_bankIdentityOwner == transaction.userId) {
+        final identity = _bankIdentities[transaction.id];
+        if (identity != null) return identity;
+      }
+      for (final bank in banks) {
+        if (bank.id == transaction.bankId) return bank.name;
+      }
+      final cardId = CardOwnership.ownerCardId(transaction, cards);
+      for (final card in cards) {
+        if (card.id == cardId) return card.bankName;
+      }
+      return BankCatalog.byIdentity(transaction.merchantName)?.name;
+    }
+
     return BlocBuilder<TransactionsListCubit, TransactionsListState>(
       bloc: controller,
       builder: (context, _) {
@@ -624,16 +613,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         // 3. Inline banners (never replace the list).
         final banners = <Widget>[];
         if (controller.refreshError != null) {
-          banners.add(_buildInlineBanner(
-            l['errorLoading'],
-            FloosyDesign.negative,
-          ));
+          banners.add(
+            _buildInlineBanner(l['errorLoading'], FloosyDesign.negative),
+          );
         }
         if (filter.isActive) {
-          banners.add(_buildInlineBanner(
-            l['filterActiveHint'],
-            FloosyDesign.primaryPurple,
-          ));
+          banners.add(
+            _buildInlineBanner(
+              l['filterActiveHint'],
+              FloosyDesign.primaryPurple,
+            ),
+          );
         }
 
         if (filtered.isEmpty) {
@@ -643,13 +633,22 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 48, color: context.fc.textMuted),
-                  const SizedBox(height: 12),
-                  Text(l['noTransactionsFound'],
-                      style: TextStyle(color: context.fc.textMuted)),
-                ])),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.receipt_long_outlined,
+                        size: 48,
+                        color: context.fc.textMuted,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        l['noTransactionsFound'],
+                        style: TextStyle(color: context.fc.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           );
@@ -662,22 +661,21 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           slivers: [
             SliverToBoxAdapter(child: Column(children: banners)),
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (_, i) {
-                  final key = sortedKeys[i];
-                  final txs = grouped[key]!;
-                  final parts = key.split('-');
-                  final dateStr = '${parts[2]}/${parts[1]}/${parts[0]}';
-                  return TransactionGroup(
-                      dateStr: dateStr,
-                      transactions: txs,
-                      isCredit: _isCreditFn,
-                      typeIcon: _typeIconFn,
-                      unresolvedCardIds: unresolvedCardIds,
-                      onTransactionTap: _openTransactionActions);
-                },
-                childCount: sortedKeys.length,
-              ),
+              delegate: SliverChildBuilderDelegate((_, i) {
+                final key = sortedKeys[i];
+                final txs = grouped[key]!;
+                final parts = key.split('-');
+                final dateStr = '${parts[2]}/${parts[1]}/${parts[0]}';
+                return TransactionGroup(
+                  dateStr: dateStr,
+                  transactions: txs,
+                  bankNameOf: bankNameOf,
+                  isCredit: _isCreditFn,
+                  typeIcon: _typeIconFn,
+                  unresolvedCardIds: unresolvedCardIds,
+                  onTransactionTap: _openTransactionActions,
+                );
+              }, childCount: sortedKeys.length),
             ),
           ],
         );
@@ -708,12 +706,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 48, color: FloosyDesign.negative),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: FloosyDesign.negative,
+            ),
             const SizedBox(height: 12),
-            Text(l['errorLoading'],
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.fc.textSecondary)),
+            Text(
+              l['errorLoading'],
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.fc.textSecondary),
+            ),
             const SizedBox(height: 16),
             GestureDetector(
               onTap: () {
@@ -721,17 +724,22 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 _reloadForCurrentFilter();
               },
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 26, vertical: 11),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 26,
+                  vertical: 11,
+                ),
                 decoration: BoxDecoration(
                   color: FloosyDesign.primaryPurple,
                   borderRadius: BorderRadius.circular(FloosyDesign.radiusPill),
                 ),
-                child: Text(l['retry'],
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14)),
+                child: Text(
+                  l['retry'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
           ],

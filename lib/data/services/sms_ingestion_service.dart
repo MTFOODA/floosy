@@ -51,7 +51,7 @@ class SmsIngestionService {
   ///     it are considered NEW. It is pushed down to the NATIVE inbox query
   ///     (`sinceDateMs`), so an incremental scan does not even transfer old
   ///     messages over the platform channel (ANR fix).
-  ///   * [before] is the exclusive upper bound used to walk backwards through
+  ///   * [before] is the inclusive upper bound used to walk backwards through
   ///     history one bounded page at a time (first-run baseline and backlog
   ///     draining). It is pushed down as `untilDateMs`.
   ///
@@ -77,16 +77,18 @@ class SmsIngestionService {
     Object? timeoutError,
   }) {
     int ms(DateTime a, DateTime b) => b.difference(a).inMilliseconds;
-    logInfo('SMS_SCAN_STAGES '
-        'inbox_ms=${ms(startedAt, readDoneAt)} '
-        'localDedupe_ms=${ms(readDoneAt, localDedupeDoneAt)} '
-        'remoteDedupe_ms=${ms(localDedupeDoneAt, remoteDedupeDoneAt)} '
-        'process_ms=${ms(remoteDedupeDoneAt, DateTime.now())} '
-        'total_ms=${ms(startedAt, DateTime.now())} '
-        'scanned=$scanned eligible=$eligible already=$alreadyProcessed '
-        'new=$newlyProcessed nonBank=$skippedNonBank '
-        'parseFailures=$parseFailures errors=$errors '
-        'created=$transactionsCreated');
+    logInfo(
+      'SMS_SCAN_STAGES '
+      'inbox_ms=${ms(startedAt, readDoneAt)} '
+      'localDedupe_ms=${ms(readDoneAt, localDedupeDoneAt)} '
+      'remoteDedupe_ms=${ms(localDedupeDoneAt, remoteDedupeDoneAt)} '
+      'process_ms=${ms(remoteDedupeDoneAt, DateTime.now())} '
+      'total_ms=${ms(startedAt, DateTime.now())} '
+      'scanned=$scanned eligible=$eligible already=$alreadyProcessed '
+      'new=$newlyProcessed nonBank=$skippedNonBank '
+      'parseFailures=$parseFailures errors=$errors '
+      'created=$transactionsCreated',
+    );
     if (timeoutError != null) {
       logError('SMS_SCAN_STAGE_TIMEOUT', timeoutError);
     }
@@ -101,21 +103,44 @@ class SmsIngestionService {
   }) async {
     final startedAt = DateTime.now();
     since = _lowerBound(since);
-    if (importStart != null &&
-        before != null &&
-        before.isBefore(importStart!)) {
-      before = null;
+    if (!await inboxService.hasPermissions()) {
+      return const SmsIngestionResult(
+        scanned: 0,
+        transactionsCreated: 0,
+        duplicatesOrSkipped: 0,
+        errors: 1,
+      );
     }
-    logInfo('SMS_SCAN_START userId=$userId max=$maxMessages '
-        'since=${since?.toIso8601String()} before=${before?.toIso8601String()}');
+    if (since != null && before != null && before.isBefore(since)) {
+      return const SmsIngestionResult(
+        scanned: 0,
+        transactionsCreated: 0,
+        duplicatesOrSkipped: 0,
+        errors: 0,
+      );
+    }
+    logInfo(
+      'SMS_SCAN_START userId=$userId max=$maxMessages '
+      'since=${since?.toIso8601String()} before=${before?.toIso8601String()}',
+    );
 
     // Native date filtering for BOTH bounds: an incremental poll transfers only
     // the messages it can actually use.
-    final messages = await inboxService.readInbox(
-      maxCount: maxMessages,
-      sinceDate: since,
-      untilDate: before,
-    );
+    final List<SmsInboxMessage> messages;
+    try {
+      messages = await inboxService.readInbox(
+        maxCount: maxMessages,
+        sinceDate: since,
+        untilDate: before,
+      );
+    } catch (_) {
+      return const SmsIngestionResult(
+        scanned: 0,
+        transactionsCreated: 0,
+        duplicatesOrSkipped: 0,
+        errors: 1,
+      );
+    }
     final readDoneAt = DateTime.now();
 
     var created = 0;
@@ -150,7 +175,14 @@ class SmsIngestionService {
       remoteDedupeDoneAt = DateTime.now();
     }
 
-    for (final message in messages) {
+    for (var index = 0; index < messages.length; index++) {
+      final message = messages[index];
+      // Processing one financial SMS can involve parsing, encryption and local
+      // writes. Yield periodically during a historical page so Android can
+      // dispatch focus/touch events instead of reporting an ANR on a full inbox.
+      if (index > 0 && index % 10 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
       if (oldestSeen == null || message.date.isBefore(oldestSeen)) {
         oldestSeen = message.date;
       }
@@ -174,7 +206,6 @@ class SmsIngestionService {
         if (!await _recognizedSender(userId, message, knownBanks)) {
           skippedNonBank++;
           skipped++;
-          logDebug('SMS_SKIPPED_UNRECOGNIZED_SENDER sender=${message.sender}');
           continue;
         }
         eligible++;
@@ -182,8 +213,9 @@ class SmsIngestionService {
         // Ledger gate: an already processed message is skipped WITHOUT
         // re-parsing it (requirement: never reread/reparse old SMS).
         if (message.body.isNotEmpty) {
-          final hash =
-              SMSParser.fingerprintOf('${message.sender}|${message.body}');
+          final hash = SMSParser.fingerprintOf(
+            '${message.sender}|${message.body}',
+          );
           if (hash.isNotEmpty && knownHashes.contains(hash)) {
             alreadyProcessed++;
             skipped++;
@@ -203,18 +235,15 @@ class SmsIngestionService {
         if (recorded) {
           created++;
           newlyProcessed++;
-          logInfo('SMS_TRANSACTION_CREATED sender=${message.sender} '
-              'at=${message.date.toIso8601String()}');
         } else {
           parseFailures++;
           skipped++;
-          logInfo(
-              'TRANSACTION_SKIPPED sender=${message.sender} reason=duplicate_or_unparseable');
         }
-      } catch (e) {
+      } catch (_) {
         // One malformed message never stops the rest of the scan.
         errors++;
-        logError('TRANSACTION_FAILED sender=${message.sender}', e);
+        // This aggregate is deliberately logged only after the page below;
+        // one log event per malformed SMS can itself stall debug builds.
       }
     }
 
@@ -232,8 +261,10 @@ class SmsIngestionService {
       oldestSeenOnPage: oldestSeen,
       newestSeenOnPage: newestSeen,
     );
-    logInfo('SMS_SCAN_DONE $result '
-        'elapsed_ms=${DateTime.now().difference(startedAt).inMilliseconds}');
+    logInfo(
+      'SMS_SCAN_DONE $result '
+      'elapsed_ms=${DateTime.now().difference(startedAt).inMilliseconds}',
+    );
     // One aggregate timing line per scan (never per message): pinpoints which
     // pipeline stage owns the 60 s budget on a real device.
     _logScanStages(
@@ -310,7 +341,8 @@ class SmsIngestionService {
       } catch (e) {
         // One failed page must not abort the whole historical scan.
         logError('SMS_RANGE_EXPANSION_PAGE_FAILED page=${pages + 1}', e);
-        total = total +
+        total =
+            total +
             const SmsIngestionResult(
               scanned: 0,
               transactionsCreated: 0,
@@ -352,7 +384,8 @@ class SmsIngestionService {
     }
 
     if (truncated) {
-      total = total +
+      total =
+          total +
           const SmsIngestionResult(
             scanned: 0,
             transactionsCreated: 0,
@@ -394,7 +427,9 @@ class SmsIngestionService {
           .timeout(batchDedupeTimeout);
     } on TimeoutException catch (e) {
       logError(
-          'SMS_BATCH_DEDUPE_TIMEOUT falling back to per-message dedupe', e);
+        'SMS_BATCH_DEDUPE_TIMEOUT falling back to per-message dedupe',
+        e,
+      );
       return {};
     } catch (e) {
       logError('SMS_BATCH_DEDUPE_FAILED falling back to per-message dedupe', e);
@@ -493,7 +528,7 @@ class SmsIngestionService {
         // Only messages inside the expanded window (inclusive bounds).
         final inWindow =
             (windowStart == null || !message.date.isBefore(windowStart)) &&
-                (pageUntil == null || !message.date.isAfter(pageUntil));
+            (pageUntil == null || !message.date.isAfter(pageUntil));
         if (!inWindow) {
           skipped++;
           continue;
@@ -502,8 +537,9 @@ class SmsIngestionService {
 
         // The processed ledger is authoritative: already processed messages
         // are skipped WITHOUT parsing again.
-        final hash =
-            SMSParser.fingerprintOf('${message.sender}|${message.body}');
+        final hash = SMSParser.fingerprintOf(
+          '${message.sender}|${message.body}',
+        );
         if (hash.isNotEmpty && knownHashes.contains(hash)) {
           alreadyProcessed++;
           skipped++;
@@ -563,12 +599,21 @@ class SmsIngestionService {
   }
 
   Future<bool> _recognizedSender(
-      String userId, SmsInboxMessage message, List<Bank> banks) async {
+    String userId,
+    SmsInboxMessage message,
+    List<Bank> banks,
+  ) async {
+    final mappings = processor.bankSenderMappingStore;
+    if (mappings != null && await mappings.isRejected(userId, message.sender)) {
+      return false;
+    }
     if (SMSParser.isRecognizedBankOrWalletSender(
-        sender: message.sender, knownBanks: banks, body: message.body)) {
+      sender: message.sender,
+      knownBanks: banks,
+      body: message.body,
+    )) {
       return true;
     }
-    final mappings = processor.bankSenderMappingStore;
     if (mappings == null) return false;
     if (await mappings.getBankForSender(userId, message.sender) != null) {
       return true;

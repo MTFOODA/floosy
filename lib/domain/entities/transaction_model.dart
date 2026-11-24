@@ -14,7 +14,7 @@ enum TransactionType {
   transfer_out,
   adjustment,
   refund,
-  reversal
+  reversal,
 }
 
 extension TransactionTypeX on TransactionType {
@@ -49,7 +49,7 @@ DateTime _dateTimeFromJsonRequired(dynamic value) =>
     DateTime.parse(value.toString()).toUtc();
 
 @freezed
-class Transaction with _$Transaction {
+abstract class Transaction with _$Transaction {
   const factory Transaction({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -80,7 +80,7 @@ class Transaction with _$Transaction {
 }
 
 @freezed
-class SMSMessage with _$SMSMessage {
+abstract class SMSMessage with _$SMSMessage {
   const factory SMSMessage({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -124,7 +124,7 @@ class SMSMessage with _$SMSMessage {
 }
 
 @freezed
-class Expense with _$Expense {
+abstract class Expense with _$Expense {
   const factory Expense({
     required String id,
     @JsonKey(name: 'user_id') required String userId,
@@ -148,7 +148,7 @@ class Expense with _$Expense {
 }
 
 @freezed
-class ExpenseItem with _$ExpenseItem {
+abstract class ExpenseItem with _$ExpenseItem {
   const factory ExpenseItem({
     required String id,
     @JsonKey(name: 'expense_id') required String expenseId,
@@ -165,7 +165,7 @@ class ExpenseItem with _$ExpenseItem {
 }
 
 @freezed
-class ItemUsage with _$ItemUsage {
+abstract class ItemUsage with _$ItemUsage {
   const factory ItemUsage({
     required String id,
     @JsonKey(name: 'user_id') required String userId,

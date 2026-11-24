@@ -10,30 +10,37 @@ class ExpenseLocalDataSource {
   ExpenseLocalDataSource(this._db);
 
   Future<void> insertExpense(Expense expense) async {
-    await _db.into(_db.expenses).insert(db.ExpensesCompanion(
-          id: Value(expense.id),
-          userId: Value(expense.userId),
-          transactionId: Value(expense.transactionId),
-          categoryId: Value(expense.categoryId),
-          amountMinor: Value(expense.amountMinor),
-          currency: Value(expense.currency),
-          expenseDate: Value(expense.expenseDate),
-          paymentMethod: Value(expense.paymentMethod.name),
-          merchantId: Value(expense.merchantId),
-          notes: Value(expense.notes),
-          createdAt: Value(expense.createdAt ?? DateTime.now()),
-          updatedAt: Value(expense.updatedAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.expenses)
+        .insert(
+          db.ExpensesCompanion(
+            id: Value(expense.id),
+            userId: Value(expense.userId),
+            transactionId: Value(expense.transactionId),
+            categoryId: Value(expense.categoryId),
+            amountMinor: Value(expense.amountMinor),
+            currency: Value(expense.currency),
+            expenseDate: Value(expense.expenseDate),
+            paymentMethod: Value(expense.paymentMethod.name),
+            merchantId: Value(expense.merchantId),
+            notes: Value(expense.notes),
+            createdAt: Value(expense.createdAt ?? DateTime.now()),
+            updatedAt: Value(expense.updatedAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<Expense>> getExpenses(String userId) async {
-    final rows = await (_db.select(_db.expenses)
-          ..where((t) => t.userId.equals(userId))
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.expenseDate, mode: OrderingMode.desc)
-          ]))
-        .get();
+    final rows =
+        await (_db.select(_db.expenses)
+              ..where((t) => t.userId.equals(userId))
+              ..orderBy([
+                (t) => OrderingTerm(
+                  expression: t.expenseDate,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
     return rows.map(_mapExpense).toList();
   }
 
@@ -42,31 +49,37 @@ class ExpenseLocalDataSource {
   }
 
   Future<void> insertExpenseItem(ExpenseItem item) async {
-    await _db.into(_db.expenseItems).insert(db.ExpenseItemsCompanion(
-          id: Value(item.id),
-          expenseId: Value(item.expenseId),
-          itemId: Value(item.itemId),
-          quantity: Value(item.quantity),
-          unitPriceMinor: Value(item.unitPriceMinor),
-          totalPriceMinor: Value(item.totalPriceMinor),
-          createdAt: Value(item.createdAt ?? DateTime.now()),
-        ));
+    await _db
+        .into(_db.expenseItems)
+        .insert(
+          db.ExpenseItemsCompanion(
+            id: Value(item.id),
+            expenseId: Value(item.expenseId),
+            itemId: Value(item.itemId),
+            quantity: Value(item.quantity),
+            unitPriceMinor: Value(item.unitPriceMinor),
+            totalPriceMinor: Value(item.totalPriceMinor),
+            createdAt: Value(item.createdAt ?? DateTime.now()),
+          ),
+        );
   }
 
   Future<List<ExpenseItem>> getExpenseItems(String expenseId) async {
-    final rows = await (_db.select(_db.expenseItems)
-          ..where((t) => t.expenseId.equals(expenseId)))
-        .get();
+    final rows = await (_db.select(
+      _db.expenseItems,
+    )..where((t) => t.expenseId.equals(expenseId))).get();
     return rows
-        .map((r) => ExpenseItem(
-              id: r.id,
-              expenseId: r.expenseId,
-              itemId: r.itemId,
-              quantity: r.quantity,
-              unitPriceMinor: r.unitPriceMinor,
-              totalPriceMinor: r.totalPriceMinor,
-              createdAt: r.createdAt,
-            ))
+        .map(
+          (r) => ExpenseItem(
+            id: r.id,
+            expenseId: r.expenseId,
+            itemId: r.itemId,
+            quantity: r.quantity,
+            unitPriceMinor: r.unitPriceMinor,
+            totalPriceMinor: r.totalPriceMinor,
+            createdAt: r.createdAt,
+          ),
+        )
         .toList();
   }
 
@@ -79,8 +92,9 @@ class ExpenseLocalDataSource {
       amountMinor: row.amountMinor,
       currency: row.currency,
       expenseDate: row.expenseDate,
-      paymentMethod:
-          row.paymentMethod == 'cash' ? PaymentMethod.cash : PaymentMethod.card,
+      paymentMethod: row.paymentMethod == 'cash'
+          ? PaymentMethod.cash
+          : PaymentMethod.card,
       merchantId: row.merchantId,
       notes: row.notes,
       createdAt: row.createdAt,
