@@ -2,9 +2,6 @@ import '../widgets/change_password_dialog.dart';
 import '../widgets/local_privacy_dialog.dart';
 import '../widgets/bank_mappings_sheet.dart';
 import '../widgets/backup_actions.dart';
-import '../../../dashboard/presentation/widgets/salary_setup_dialog.dart';
-import '../../../dashboard/presentation/cubit/finance_cubit.dart';
-import '../../../dashboard/presentation/cubit/salary_plan_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'ios_bank_messages_screen.dart';
@@ -246,8 +243,6 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildAccountCard(BuildContext context, AppLocalizations l) {
-    final finance = context.watch<FinanceCubit>().state.value;
-    final canConfigureSalary = finance?.card?.isCreditCard != true;
     return Container(
       decoration: BoxDecoration(
         color: context.fc.primarySurface,
@@ -262,18 +257,6 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => _showBankMappingsSheet(context, l),
           ),
           Divider(height: 1, color: context.fc.borderSubtle),
-          if (canConfigureSalary) ...[
-            _SettingsRow(
-              icon: Icons.payments_outlined,
-              label: l['salaryCycle'],
-              onTap: () => showSalarySetupDialog(
-                context,
-                currentBalanceMinor: finance?.summary.myBalanceMinor ?? 0,
-                existing: context.read<SalaryPlanCubit>().state.value?.plan,
-              ),
-            ),
-            Divider(height: 1, color: context.fc.borderSubtle),
-          ],
           _SettingsRow(
             icon: Icons.lock_outline_rounded,
             label: l['changePassword'],

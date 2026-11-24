@@ -8,7 +8,6 @@ import '../../../../core/widgets/common/finance_panel.dart';
 import '../../../../domain/entities/salary_plan.dart';
 import '../../../../domain/entities/detected_card_model.dart';
 import '../cubit/salary_plan_cubit.dart';
-import 'salary_setup_dialog.dart';
 
 /// Live view of the selected account during its salary cycle. It shares the
 /// same ledger as My Balance and never creates a second movement.
@@ -31,48 +30,10 @@ class SalaryCycleCard extends StatelessWidget {
     }
     final state = context.watch<SalaryPlanCubit>().state;
     final summary = state.value;
-    if (state.isLoading && summary == null) {
-      return const SizedBox(
-        height: 126,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
     if (summary == null || !summary.isConfigured) {
-      return FinancePanel(
-        height: 154,
-        colors: const [Color(0xFF0B3E52), Color(0xFF0D8B86)],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l['salarySetupTitle'],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              l['salarySetupHomeHint'],
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: () => showSalarySetupDialog(
-                context,
-                currentBalanceMinor: currentBalanceMinor,
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Color(0x99FFFFFF)),
-              ),
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              label: Text(l['salarySetupAction']),
-            ),
-          ],
-        ),
-      );
+      // The card-management screen is the single entry point for creating a
+      // salary plan. The dashboard stays quiet for cards without one.
+      return const SizedBox.shrink();
     }
     return _ConfiguredSalaryCard(
       summary: summary!,
@@ -119,19 +80,6 @@ class _ConfiguredSalaryCard extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
-              ),
-              IconButton(
-                tooltip: l['salarySetupAction'],
-                onPressed: () => showSalarySetupDialog(
-                  context,
-                  currentBalanceMinor: currentBalanceMinor,
-                  existing: summary.plan,
-                ),
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white70,
-                  size: 20,
                 ),
               ),
             ],

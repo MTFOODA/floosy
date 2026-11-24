@@ -199,7 +199,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   child: Padding(
                     padding: FloosyDesign.horizontalPadding(
                       context,
-                    ).copyWith(top: 16, bottom: 100),
+                    ).copyWith(top: 16, bottom: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

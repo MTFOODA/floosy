@@ -8,6 +8,10 @@ import '../../../../core/theme/app_design_system.dart';
 import '../../../../domain/entities/detected_card_model.dart';
 import '../widgets/detected_bank_card.dart';
 import '../widgets/card_customization_sheet.dart';
+import '../../../dashboard/presentation/cubit/finance_cubit.dart';
+import '../../../dashboard/presentation/cubit/salary_plan_cubit.dart';
+import '../../../dashboard/presentation/widgets/salary_setup_dialog.dart';
+import '../../../../core/localization/preferences_cubit.dart';
 
 /// "Detected Cards" page (requirement #6). Accessible from Settings.
 class DetectedCardsScreen extends StatelessWidget {
@@ -107,6 +111,17 @@ class DetectedCardsScreen extends StatelessWidget {
                   onEdit: () => _openCustomization(context, card),
                   showEye: false,
                 ),
+                if (!card.isCreditCard) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openSalarySetup(context, card),
+                      icon: const Icon(Icons.payments_outlined, size: 18),
+                      label: Text(l['salaryCycle']),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   '${card.bankName == null ? AppLocalizations.s(context)['bankUnknown'] : BankCatalog.displayName(card.bankName, arabic: AppLocalizations.s(context).isArabic)} •••• ${card.last4}',
@@ -134,6 +149,26 @@ class DetectedCardsScreen extends StatelessWidget {
     if (changed == true) {
       repo.reload();
     }
+  }
+
+  Future<void> _openSalarySetup(BuildContext context, DetectedCard card) async {
+    if (card.isCreditCard) return;
+    await context.read<SelectedCardCubit>().setSelectedCard(
+      card.last4,
+      bankName: card.bankName,
+    );
+    final finance = context.read<FinanceCubit>();
+    final salary = context.read<SalaryPlanCubit>();
+    await finance.reload();
+    await salary.reload();
+    if (!context.mounted) return;
+    final snapshot = finance.state.value;
+    if (snapshot?.card?.id != card.id) return;
+    await showSalarySetupDialog(
+      context,
+      currentBalanceMinor: snapshot?.summary.myBalanceMinor ?? 0,
+      existing: salary.state.value?.plan,
+    );
   }
 }
 

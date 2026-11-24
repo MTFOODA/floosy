@@ -153,7 +153,7 @@ class TransactionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: context.fc.primarySurface,
             borderRadius: BorderRadius.circular(FloosyDesign.radiusMedium),
@@ -293,9 +293,9 @@ class TransactionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               SizedBox(
-                width: MediaQuery.sizeOf(context).width < 360 ? 100 : 122,
+                width: MediaQuery.sizeOf(context).width < 360 ? 88 : 104,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

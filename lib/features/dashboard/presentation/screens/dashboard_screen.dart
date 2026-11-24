@@ -26,7 +26,6 @@ import '../../../../core/widgets/common/finance_panel.dart';
 import '../../../../routing/app_routes.dart';
 import '../widgets/card_selector_section.dart';
 import '../widgets/salary_cycle_card.dart';
-import '../widgets/salary_setup_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,7 +37,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   /// Item id currently being purchased Ã¢â‚¬â€ duplicate-tap protection (#27).
   String? _purchasingItemId;
-  bool _salaryPrompted = false;
 
   /// Toggles the eye visibility for the currently selected card ONLY.
   ///
@@ -111,19 +109,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? context.watch<ItemsCubit>().state.map((data) => data.active)
         : null;
     final userName = profileAsync.value?.fullName ?? l['greetingFriend'];
-    if (!_salaryPrompted &&
-        salaryState.hasValue &&
-        !(salaryState.value?.isConfigured ?? false)) {
-      _salaryPrompted = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          showSalarySetupDialog(
-            context,
-            currentBalanceMinor: summaryAsync.value?.myBalanceMinor ?? 0,
-          );
-        }
-      });
-    }
+    final showSalaryCycle =
+        financeAsync.value?.card?.isCreditCard != true &&
+        (salaryState.value?.isConfigured ?? false);
     return Scaffold(
       backgroundColor: context.fc.background,
       body: SafeArea(
@@ -157,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const DetectedCardsSection(),
                 const SizedBox(height: 20),
                 _buildBalanceCard(summaryAsync, l),
-                if (financeAsync.value?.card?.isCreditCard != true) ...[
+                if (showSalaryCycle) ...[
                   const SizedBox(height: 20),
                   SalaryCycleCard(
                     currentBalanceMinor:
@@ -165,6 +153,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     selectedCard: financeAsync.value?.card,
                   ),
                   const SizedBox(height: 20),
+                ] else ...[
+                  const SizedBox(height: 14),
                 ],
                 _buildSummaryCards(summaryAsync, l),
                 const SizedBox(height: 24),
