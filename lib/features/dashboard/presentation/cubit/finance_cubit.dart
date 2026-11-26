@@ -110,6 +110,13 @@ class FinanceCubit extends AsyncCubit<FinanceSnapshot> {
     _onChanged();
   }
 
+  Future<int> currentBalanceForCard(DetectedCard card) async =>
+      (await _repository.getCardBalance(
+        card.userId,
+        card.last4,
+        bankName: card.bankName,
+      )).myBalanceMinor;
+
   Future<int?> getMaxAddableForCard(
     String userId,
     String cardLast4, {

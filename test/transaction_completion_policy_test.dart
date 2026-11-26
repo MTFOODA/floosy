@@ -9,6 +9,7 @@ import 'package:floosy/domain/entities/transaction_model.dart';
 import 'package:floosy/domain/entities/transaction_edit_policy.dart';
 import 'package:floosy/domain/entities/user_model.dart';
 import 'package:floosy/domain/usecases/save_transaction_edit.dart';
+import 'package:floosy/domain/usecases/create_manual_transaction.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -90,6 +91,7 @@ void main() {
     String? bank,
     String? category,
     String? note,
+    String? selectedCardId,
   }) => TransactionEditDraft(
     transaction: t,
     type: type ?? t.type,
@@ -101,6 +103,134 @@ void main() {
     merchantName: merchant ?? t.merchantName,
     transactionDate: date ?? t.transactionDate,
     additionalNote: note,
+    selectedCardId: selectedCardId,
+  );
+
+  test(
+    'manual purchases use the selected card ID and support no card',
+    () async {
+      final card = await deps.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2307',
+        bankName: 'Faisal Bank',
+      );
+      final other = await deps.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2307',
+        bankName: 'CIB',
+      );
+      var id = 0;
+      final create = CreateManualTransaction(
+        deps.transactionRepository,
+        cards: deps.detectedCardRepository,
+        money: deps.moneyRepository,
+        createId: () => 'manual-${id++}',
+        now: () => DateTime(2026, 11, 26, 16, 5),
+      );
+      final linked = await create(
+        userId: 'u',
+        type: TransactionType.purchase,
+        amountMinor: 20000,
+        currency: 'EGP',
+        cardId: card.id,
+      );
+      final unlinked = await create(
+        userId: 'u',
+        type: TransactionType.purchase,
+        amountMinor: 10000,
+        currency: 'EGP',
+      );
+      expect(linked.cardId, card.id);
+      expect(linked.cardLast4, card.last4);
+      expect(unlinked.cardId, isNull);
+      final selectedBalance = await deps.moneyRepository.getCardBalance(
+        'u',
+        card.last4,
+        bankName: card.bankName,
+      );
+      final otherBalance = await deps.moneyRepository.getCardBalance(
+        'u',
+        other.last4,
+        bankName: other.bankName,
+      );
+      expect(selectedBalance.myBalanceMinor, -20000);
+      expect(otherBalance.myBalanceMinor, 0);
+      await editor.save(
+        draft(unlinked, bank: 'Faisal Islamic Bank of Egypt', last4: '2307'),
+      );
+      expect(await deps.detectedCardRepository.getCards('u'), hasLength(2));
+      expect(
+        (await deps.moneyRepository.getTransactionsForCard(
+          'u',
+          card.last4,
+          bankName: card.bankName,
+        )).map((tx) => tx.id),
+        unorderedEquals([linked.id, unlinked.id]),
+      );
+    },
+  );
+
+  test(
+    'legacy duplicate can be corrected without applying the purchase twice',
+    () async {
+      final card = await deps.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2307',
+        bankName: 'Faisal Bank',
+      );
+      final alias = await deps.detectedCardRepository.upsertCard(
+        userId: 'u',
+        last4: '2307',
+        bankName: 'Faisal Islamic Bank of',
+      );
+      expect(alias.id, card.id);
+      final duplicate = card.copyWith(
+        id: 'legacy',
+        bankName: 'faisal islamic bank of',
+      );
+      await deps.detectedCardLocalDataSource.saveCards('u', [card, duplicate]);
+      final tx = Transaction(
+        id: 'legacy-purchase',
+        userId: 'u',
+        type: TransactionType.purchase,
+        source: TransactionSource.manual,
+        amountMinor: 20000,
+        fingerprint: 'legacy-purchase',
+        cardId: duplicate.id,
+        cardLast4: duplicate.last4,
+        transactionDate: DateTime(2026, 11, 26),
+      );
+      await deps.transactionRepository.createTransaction(transaction: tx);
+      final policy = await editor.policy(tx);
+      expect(
+        policy.cardOptions.map((c) => c.id),
+        unorderedEquals([card.id, duplicate.id]),
+      );
+      await editor.save(
+        draft(tx, bank: duplicate.bankName, selectedCardId: card.id),
+      );
+      final rows = await deps.transactionRepository.getTransactions(
+        userId: 'u',
+      );
+      expect(rows.single.cardId, card.id);
+      expect(rows.single.amountMinor, tx.amountMinor);
+      expect(
+        (await deps.moneyRepository.getCardBalance(
+          'u',
+          card.last4,
+          bankName: card.bankName,
+        )).myBalanceMinor,
+        -20000,
+      );
+      expect(
+        (await deps.moneyRepository.getCardBalance(
+          'u',
+          duplicate.last4,
+          bankName: duplicate.bankName,
+        )).myBalanceMinor,
+        0,
+      );
+    },
   );
 
   test(

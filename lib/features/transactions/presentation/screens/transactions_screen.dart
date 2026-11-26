@@ -536,7 +536,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       result = result
-          .where((t) => (t.merchantName?.toLowerCase().contains(q) ?? false))
+          .where(
+            (t) =>
+                (t.merchantName?.toLowerCase().contains(q) ?? false) ||
+                (t.notes?.toLowerCase().contains(q) ?? false),
+          )
           .toList();
     }
     if (_activeFilterIndex > 0) {

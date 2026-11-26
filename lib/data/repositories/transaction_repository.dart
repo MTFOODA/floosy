@@ -45,6 +45,7 @@ class TransactionRepository
     String userId,
     String transactionId, {
     String? bankName,
+    String? cardLast4,
     TransactionType? type,
     int? amountMinor,
     String? currency,
@@ -65,11 +66,18 @@ class TransactionRepository
         'currency_identified': 1,
       },
     };
-    if (fields.isEmpty) return;
-    await _local.database.customStatement(
-      'UPDATE sms_messages SET ${fields.keys.map((k) => '"$k"=?').join(',')} WHERE user_id=? AND transaction_id=?',
-      [...fields.values, userId, transactionId],
-    );
+    if (fields.isNotEmpty) {
+      await _local.database.customStatement(
+        'UPDATE sms_messages SET ${fields.keys.map((k) => '"$k"=?').join(',')} WHERE user_id=? AND transaction_id=?',
+        [...fields.values, userId, transactionId],
+      );
+    }
+    if (cardLast4 != null) {
+      await _local.database.customStatement(
+        'UPDATE sms_messages SET detected_card_last4=?, card_last4_identified=1 WHERE user_id=? AND transaction_id=? AND detected_card_last4 IS NULL',
+        [cardLast4, userId, transactionId],
+      );
+    }
   }
 
   @override

@@ -10,6 +10,7 @@ abstract interface class TransactionEvidenceRepository {
     String userId,
     String transactionId, {
     String? bankName,
+    String? cardLast4,
     TransactionType? type,
     int? amountMinor,
     String? currency,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_design_system.dart';
+import '../../../../core/utils/money_formatter.dart';
 import '../../../../core/widgets/common/bank_logo.dart';
 import '../../../../domain/entities/bank_directory.dart';
 import '../../../../domain/entities/item_model.dart' show Category;
@@ -9,6 +10,7 @@ import '../../../../domain/entities/transaction_model.dart';
 import '../../../../domain/entities/transaction_edit_policy.dart';
 import '../../../../domain/usecases/save_transaction_edit.dart';
 import 'transaction_widgets.dart';
+import 'transaction_card_picker.dart';
 
 class TransactionEditDialog extends StatefulWidget {
   final TransactionEditPolicy policy;
@@ -46,6 +48,7 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
       ? 'EGP'
       : widget.policy.transaction.currency;
   String? _bank;
+  String? _cardId;
   late String? _category = widget.policy.transaction.categoryId;
   bool _saving = false;
   String? _error;
@@ -56,31 +59,6 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
     _merchant.dispose();
     _note.dispose();
     super.dispose();
-  }
-
-  String _digits(String raw) => raw.split('').map((c) {
-    const digits = '٠١٢٣٤٥٦٧٨٩';
-    const eastern = '۰۱۲۳۴۵۶۷۸۹';
-    final i = digits.indexOf(c), j = eastern.indexOf(c);
-    return i >= 0
-        ? '$i'
-        : j >= 0
-        ? '$j'
-        : c;
-  }).join();
-  int? _minor(String raw) {
-    var text = _digits(
-      raw,
-    ).replaceAll('٬', '').replaceAll('٫', '.').replaceAll(' ', '');
-    if (!text.contains('.') && RegExp(r'^\d+,\d{1,2}$').hasMatch(text)) {
-      text = text.replaceAll(',', '.');
-    } else {
-      text = text.replaceAll(',', '');
-    }
-    if (!RegExp(r'^\d+(?:\.\d{1,2})?$').hasMatch(text)) return null;
-    final parts = text.split('.');
-    return int.parse(parts.first) * 100 +
-        (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
   }
 
   InputDecoration _decoration(
@@ -132,13 +110,17 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
       setState(() => _error = l['chooseTypeHint']);
       return;
     }
-    final amount = p.amount ? _minor(_amount.text) : p.transaction.amountMinor;
+    final amount = p.amount
+        ? parseMoneyMinor(_amount.text)
+        : p.transaction.amountMinor;
     if (amount == null || (p.amount && amount <= 0)) {
       setState(() => _error = l['invalidAmount']);
       return;
     }
-    final last4 = _digits(_last4.text.trim());
-    if (last4.isNotEmpty && !RegExp(r'^\d{4}$').hasMatch(last4)) {
+    final last4 = normalizeMoneyDigits(_last4.text.trim());
+    if (_cardId == null &&
+        last4.isNotEmpty &&
+        !RegExp(r'^\d{4}$').hasMatch(last4)) {
       setState(() => _error = l['last4Invalid']);
       return;
     }
@@ -163,17 +145,19 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
               : p.transaction.merchantName,
           transactionDate: p.transaction.transactionDate,
           additionalNote: _note.text,
+          selectedCardId: _cardId,
         ),
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
-        setState(
-          () =>
-              _error = error is TransactionEditFailure && error.code == 'locked'
-              ? l['editLockedError']
-              : l['saveFailed'],
-        );
+        final key = switch (error) {
+          TransactionEditFailure(code: 'locked') => 'editLockedError',
+          TransactionEditFailure(code: 'chooseCard') =>
+            'transactionChooseSpecificCard',
+          _ => 'saveFailed',
+        };
+        setState(() => _error = l[key]);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -255,7 +239,21 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
             decoration: _decoration(l['currency'], enabled: false),
           ),
         ),
-      if (p.bank)
+      if (p.cardOptions.isNotEmpty)
+        TransactionCardPicker(
+          key: const ValueKey('tx_card_picker'),
+          cards: p.cardOptions,
+          selectedId: _cardId ?? p.transaction.cardId,
+          emptyLabel:
+              l[p.transaction.cardId == null
+                  ? 'transactionNoCard'
+                  : 'notSelected'],
+          decoration: _decoration(l['transactionCardOptional']),
+          onChanged: _saving
+              ? null
+              : (value) => setState(() => _cardId = value),
+        ),
+      if (_cardId == null && p.bank)
         DropdownButtonFormField<String>(
           key: const ValueKey('tx_bank'),
           initialValue: _bank,
@@ -281,7 +279,7 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
           ],
           onChanged: _saving ? null : (v) => setState(() => _bank = v),
         )
-      else
+      else if (_cardId == null)
         Opacity(
           opacity: .6,
           child: TextFormField(
@@ -293,15 +291,16 @@ class _TransactionEditDialogState extends State<TransactionEditDialog> {
             decoration: _decoration(l['bankLabel'], enabled: false),
           ),
         ),
-      _field(
-        'tx_last4',
-        _last4,
-        l['last4Label'],
-        editable: p.last4,
-        hint: l['last4Hint'],
-        keyboard: TextInputType.number,
-        maxLength: 4,
-      ),
+      if (_cardId == null)
+        _field(
+          'tx_last4',
+          _last4,
+          l['last4Label'],
+          editable: p.last4,
+          hint: l['last4Hint'],
+          keyboard: TextInputType.number,
+          maxLength: 4,
+        ),
       Opacity(
         opacity: .6,
         child: TextFormField(

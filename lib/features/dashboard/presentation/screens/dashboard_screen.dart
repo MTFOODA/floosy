@@ -110,8 +110,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : null;
     final userName = profileAsync.value?.fullName ?? l['greetingFriend'];
     final showSalaryCycle =
-        financeAsync.value?.card?.isCreditCard != true &&
-        (salaryState.value?.isConfigured ?? false);
+        financeAsync.value?.card?.isCreditCard == false &&
+        (salaryState.value?.isConfigured ?? false) &&
+        salaryState.value?.plan?.cardId == financeAsync.value?.card?.id;
     return Scaffold(
       backgroundColor: context.fc.background,
       body: SafeArea(

@@ -119,6 +119,8 @@ class AppRuntime {
     DeleteTransaction(repositories.transactions, repositories.cards),
     CreateManualTransaction(
       repositories.transactions,
+      cards: repositories.cards,
+      money: repositories.money,
       createId: const Uuid().v4,
     ),
   );

@@ -43,17 +43,23 @@ class DetectedCardRepository implements domain.DetectedCardRepository {
   }) async {
     final cards = await local.getCards(userId);
     final bank = normalizeBankIdentity(bankName);
-    final existingIdx = cards.indexWhere(
+    var existingIdx = cards.indexWhere(
       (c) => c.last4 == last4 && normalizeBankIdentity(c.bankName) == bank,
     );
+    if (existingIdx < 0) {
+      existingIdx = cards.indexWhere(
+        (c) => c.last4 == last4 && sameIssuingBank(c.bankName, bankName),
+      );
+    }
 
     if (existingIdx >= 0) {
       final existing = cards[existingIdx];
       final updated = existing.copyWith(
-        bankName: bankName ?? existing.bankName,
         transactionCount:
-            (existing.transactionCount + (transactionCountDelta ?? 0))
-                .clamp(0, 1 << 30),
+            (existing.transactionCount + (transactionCountDelta ?? 0)).clamp(
+              0,
+              1 << 30,
+            ),
         appearance: appearance ?? existing.appearance,
       );
       cards[existingIdx] = updated;

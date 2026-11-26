@@ -28,15 +28,13 @@ class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
       return Future.value();
     }
     return load(
-      () => _repository.summaryFor(
-        userId,
-        cardId: card.id,
-        reference: reference,
-      ),
+      () =>
+          _repository.summaryFor(userId, cardId: card.id, reference: reference),
     );
   }
 
   Future<void> configure({
+    required DetectedCard card,
     required int monthlySalaryMinor,
     required int cycleStartDay,
     required int startingBalanceMinor,
@@ -44,8 +42,7 @@ class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
   }) async {
     final userId = _userId();
     if (userId == null) throw StateError('Sign in first');
-    final card = _selectedCard();
-    if (card == null || card.isCreditCard) {
+    if (card.userId != userId || card.isCreditCard) {
       throw StateError('Salary plans require a debit card');
     }
     await _repository.configure(
@@ -61,6 +58,9 @@ class SalaryPlanCubit extends AsyncCubit<SalaryCycleSummary> {
     await reload();
     _onChanged();
   }
+
+  Future<SalaryPlan?> planFor(DetectedCard card) =>
+      _repository.getPlan(card.userId, cardId: card.id);
 
   static SalaryCycleSummary empty() {
     final now = DateTime.now();

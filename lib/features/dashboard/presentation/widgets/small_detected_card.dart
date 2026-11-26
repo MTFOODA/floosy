@@ -94,58 +94,82 @@ class SmallDetectedCard extends StatelessWidget {
                       size: 110,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final scale = (constraints.maxHeight / 94)
+                          .clamp(0.0, 1.0)
+                          .toDouble();
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12 * scale,
+                          vertical: 9 * scale,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            BankLogo(bankName: card.bankName, size: 26),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                bank,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: foreground,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                            Row(
+                              children: [
+                                BankLogo(
+                                  bankName: card.bankName,
+                                  size: 26 * scale,
+                                ),
+                                SizedBox(width: 6 * scale),
+                                Expanded(
+                                  child: Text(
+                                    bank,
+                                    textScaler: MediaQuery.textScalerOf(
+                                      context,
+                                    ).clamp(maxScaleFactor: 1.5),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: foreground,
+                                      fontSize: 11 * scale,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.contactless_rounded,
+                                  color: foreground.withValues(alpha: .78),
+                                  size: 19 * scale,
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Container(
+                              width: 25 * scale,
+                              height: 18 * scale,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8C86A),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFFC99E2B),
+                                ),
+                              ),
+                              child: const _ChipLines(),
+                            ),
+                            SizedBox(height: 7 * scale),
+                            SizedBox(
+                              height: 20 * scale,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '•••• ${card.last4}',
+                                  textDirection: TextDirection.ltr,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    letterSpacing: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
-                            Icon(
-                              Icons.contactless_rounded,
-                              color: foreground.withValues(alpha: .78),
-                              size: 19,
-                            ),
                           ],
                         ),
-                        const Spacer(),
-                        Container(
-                          width: 25,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8C86A),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFC99E2B)),
-                          ),
-                          child: const _ChipLines(),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          '•••• ${card.last4}',
-                          textDirection: TextDirection.ltr,
-                          style: TextStyle(
-                            color: foreground,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -1,151 +1,185 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/theme/app_design_system.dart';
+import '../../../../core/utils/money_formatter.dart';
 import '../../../../domain/entities/salary_plan.dart';
-import '../../../auth/presentation/cubit/auth_cubit.dart';
-import '../cubit/finance_cubit.dart';
-import '../cubit/salary_plan_cubit.dart';
 
 Future<void> showSalarySetupDialog(
   BuildContext context, {
   required int currentBalanceMinor,
   SalaryPlan? existing,
-}) async {
-  final l = AppLocalizations.s(context);
-  final salary = TextEditingController(
-    text: existing == null
+  required Future<void> Function(int balance, int? salary, int day, bool detect)
+  onSave,
+}) => showDialog<void>(
+  context: context,
+  barrierDismissible: false,
+  builder: (_) => _SalarySetupDialog(
+    currentBalanceMinor: currentBalanceMinor,
+    existing: existing,
+    onSave: onSave,
+  ),
+);
+
+class _SalarySetupDialog extends StatefulWidget {
+  const _SalarySetupDialog({
+    required this.currentBalanceMinor,
+    required this.existing,
+    required this.onSave,
+  });
+
+  final int currentBalanceMinor;
+  final SalaryPlan? existing;
+  final Future<void> Function(int balance, int? salary, int day, bool detect)
+  onSave;
+
+  @override
+  State<_SalarySetupDialog> createState() => _SalarySetupDialogState();
+}
+
+class _SalarySetupDialogState extends State<_SalarySetupDialog> {
+  final _form = GlobalKey<FormState>();
+  late final _salary = TextEditingController(
+    text: widget.existing == null
         ? ''
-        : (existing.monthlySalaryMinor / 100).toStringAsFixed(2),
+        : (widget.existing!.monthlySalaryMinor / 100).toStringAsFixed(2),
   );
-  // Always show the live account value. Re-saving a plan must not replace a
-  // newer balance with an old saved snapshot.
-  final balance = TextEditingController(
-    text: (currentBalanceMinor / 100).toStringAsFixed(2),
+  late final _balance = TextEditingController(
+    text: (widget.currentBalanceMinor / 100).toStringAsFixed(2),
   );
-  var day = existing?.cycleStartDay ?? 1;
-  var detect = existing?.autoDetectSalary ?? true;
-  final saved = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        backgroundColor: context.fc.primarySurface,
-        title: Text(l['salarySetupTitle'], style: context.fc.cardTitle),
+  late int _day = widget.existing?.cycleStartDay ?? 1;
+  late bool _detect = widget.existing?.autoDetectSalary ?? true;
+  bool _saving = false;
+  bool _failed = false;
+
+  @override
+  void dispose() {
+    _salary.dispose();
+    _balance.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving || !_form.currentState!.validate()) return;
+    final salary = parseMoneyMinor(_salary.text);
+    setState(() {
+      _saving = true;
+      _failed = false;
+    });
+    try {
+      await widget.onSave(
+        parseMoneyMinor(_balance.text)!,
+        salary,
+        _day,
+        _detect,
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.s(context);
+    const keyboard = TextInputType.numberWithOptions(decimal: true);
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        title: Text(l['salarySetupTitle']),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l['salarySetupDialogHint'],
-                style: TextStyle(color: context.fc.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: salary,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: l['monthlySalary'],
-                  hintText: l['salaryAmountHint'],
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: balance,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: l['startingAccountBalance'],
-                  hintText: l['startingBalanceHint'],
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: day,
-                items: [
-                  for (var value = 1; value <= 31; value++)
-                    DropdownMenuItem(
-                      value: value,
-                      child: Text('${l['cycleStartDay']} $value'),
-                    ),
-                ],
-                onChanged: (value) => setState(() => day = value ?? 1),
-                decoration: InputDecoration(labelText: l['cycleStartDay']),
-              ),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: detect,
-                activeTrackColor: FloosyDesign.primaryPurple,
-                onChanged: (value) => setState(() => detect = value),
-                title: Text(l['autoDetectSalary']),
-                subtitle: Text(
-                  l['autoDetectSalaryHint'],
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.fc.textSecondary,
+          child: Form(
+            key: _form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l['salarySetupDialogHint']),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _balance,
+                  enabled: !_saving,
+                  keyboardType: keyboard,
+                  decoration: InputDecoration(
+                    labelText: l['startingAccountBalance'],
+                    hintText: l['startingBalanceHint'],
                   ),
+                  validator: (value) {
+                    final balance = parseMoneyMinor(value ?? '');
+                    return balance == null ||
+                            (balance < 0 &&
+                                balance != widget.currentBalanceMinor)
+                        ? l['accountBalanceInvalid']
+                        : null;
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _salary,
+                  enabled: !_saving,
+                  keyboardType: keyboard,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: l['monthlySalaryOptional'],
+                    hintText: l['salaryAmountHint'],
+                    helperText: l['salaryOptionalHint'],
+                    helperMaxLines: 2,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    return (parseMoneyMinor(value) ?? 0) <= 0
+                        ? l['invalidAmount']
+                        : null;
+                  },
+                ),
+                if (_salary.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: _day,
+                    isExpanded: true,
+                    items: [
+                      for (var day = 1; day <= 31; day++)
+                        DropdownMenuItem(value: day, child: Text('$day')),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _day = value ?? 1),
+                    decoration: InputDecoration(labelText: l['cycleStartDay']),
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: _detect,
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _detect = value),
+                    title: Text(l['autoDetectSalary']),
+                    subtitle: Text(l['autoDetectSalaryHint']),
+                  ),
+                ],
+                if (_failed)
+                  Text(
+                    l['salaryBalanceUpdateFailed'],
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            onPressed: _saving ? null : () => Navigator.of(context).pop(),
             child: Text(l['cancel']),
           ),
-          ElevatedButton(
-            onPressed: () {
-              final salaryMinor =
-                  ((double.tryParse(salary.text.trim()) ?? 0) * 100).round();
-              if (salaryMinor <= 0) return;
-              Navigator.pop(dialogContext, true);
-            },
-            child: Text(l['save']),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(l[_saving ? 'saving' : 'save']),
           ),
         ],
       ),
-    ),
-  );
-  if (saved != true || !context.mounted) {
-    salary.dispose();
-    balance.dispose();
-    return;
-  }
-  final amount = ((double.tryParse(salary.text.trim()) ?? 0) * 100).round();
-  final opening = ((double.tryParse(balance.text.trim()) ?? 0) * 100).round();
-  final userId = context.read<AuthCubit>().state.userId;
-  final finance = context.read<FinanceCubit>();
-  final salaryCubit = context.read<SalaryPlanCubit>();
-  final selectedCard = finance.state.map((data) => data.card).value;
-  try {
-    if (userId == null || selectedCard == null) {
-      throw StateError('Select a debit card before setting its balance');
-    }
-    // This is a real account baseline, not a separate planning number. The
-    // transaction ledger keeps moving it afterwards, exactly like My Balance.
-    await finance.setCurrentBalanceForCard(
-      userId: userId,
-      cardLast4: selectedCard.last4,
-      bankName: selectedCard.bankName,
-      targetBalanceMinor: opening,
     );
-    await salaryCubit.configure(
-      monthlySalaryMinor: amount,
-      cycleStartDay: day,
-      startingBalanceMinor: opening,
-      autoDetectSalary: detect,
-    );
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l['salaryBalanceUpdateFailed'])),
-      );
-    }
-  } finally {
-    salary.dispose();
-    balance.dispose();
   }
 }

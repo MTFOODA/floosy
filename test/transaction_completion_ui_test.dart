@@ -11,6 +11,9 @@ import 'package:floosy/domain/entities/item_model.dart' as items;
 import 'package:floosy/domain/usecases/save_transaction_edit.dart';
 import 'package:floosy/features/transactions/presentation/widgets/transaction_edit_dialog.dart';
 import 'package:floosy/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:floosy/features/dashboard/presentation/widgets/salary_setup_dialog.dart';
+import 'package:floosy/features/dashboard/presentation/widgets/small_detected_card.dart';
+import 'package:floosy/domain/entities/detected_card_model.dart';
 
 final _locales = <String, AppLocalizations>{};
 
@@ -51,6 +54,67 @@ void main() {
       await l.load();
       _locales[language] = l;
     }
+  });
+  testWidgets('balance-only save closes a focused salary form cleanly', (
+    tester,
+  ) async {
+    int? savedBalance;
+    int? savedSalary;
+    await tester.pumpWidget(
+      _app(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showSalarySetupDialog(
+              context,
+              currentBalanceMinor: 0,
+              onSave: (balance, salary, day, detect) async {
+                savedBalance = balance;
+                savedSalary = salary;
+              },
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+    await tester.enterText(find.byType(TextFormField).first, '69.287.04');
+    await tester.tap(find.text('حفظ'));
+    await tester.pumpAndSettle();
+    expect(savedBalance, 6928704);
+    expect(savedSalary, isNull);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('minimum-width card fits at large Arabic text size', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        Center(
+          child: SizedBox(
+            width: 156,
+            child: SmallDetectedCard(
+              card: DetectedCard(
+                id: 'c',
+                userId: 'u',
+                last4: '2307',
+                bankName: 'Faisal Bank',
+              ),
+              isSelected: true,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('•••• 2307'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   testWidgets(
     'completed fields stay disabled and shaded; missing merchant/category/card and an added note save without touching facts',

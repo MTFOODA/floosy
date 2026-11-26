@@ -1,4 +1,5 @@
 import '../entities/detected_card_model.dart';
+import '../entities/bank_directory.dart';
 import '../entities/transaction_model.dart';
 
 /// THE SINGLE SOURCE OF TRUTH for "which card does this transaction belong to?".
@@ -191,6 +192,13 @@ String? normalizeBankIdentity(String? raw) {
     }
   }
   return value.isEmpty ? null : value;
+}
+
+bool sameIssuingBank(String? first, String? second) {
+  final firstBank = BankCatalog.byIdentity(first)?.code;
+  final secondBank = BankCatalog.byIdentity(second)?.code;
+  if (firstBank != null && secondBank != null) return firstBank == secondBank;
+  return normalizeBankIdentity(first) == normalizeBankIdentity(second);
 }
 
 /// Why a card identity could or could not be proven.

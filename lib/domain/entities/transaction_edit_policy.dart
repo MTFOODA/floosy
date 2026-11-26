@@ -1,5 +1,6 @@
 import 'transaction_model.dart';
 import 'bank_directory.dart';
+import 'detected_card_model.dart';
 
 class TransactionEditEvidence {
   final String? bankName;
@@ -18,10 +19,17 @@ class TransactionEditEvidence {
 class TransactionEditPolicy {
   final Transaction transaction;
   final TransactionEditEvidence? evidence;
-  const TransactionEditPolicy(this.transaction, this.evidence);
+  final List<DetectedCard> cardOptions;
+  const TransactionEditPolicy(
+    this.transaction,
+    this.evidence, {
+    this.cardOptions = const [],
+  });
   String? get bankName =>
       evidence?.bankName ??
-      BankCatalog.byIdentity(transaction.merchantName)?.name;
+      (transaction.source == TransactionSource.manual
+          ? null
+          : BankCatalog.byIdentity(transaction.merchantName)?.name);
   bool get amount =>
       transaction.amountMinor <= 0 && evidence?.amountIdentified != true;
   bool get type => evidence?.typeIdentified == false;

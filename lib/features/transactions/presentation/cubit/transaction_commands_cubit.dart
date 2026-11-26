@@ -79,6 +79,7 @@ class TransactionCommandsCubit extends Cubit<TransactionCommandState> {
     required int amountMinor,
     required String currency,
     String? note,
+    String? cardId,
   }) async {
     final userId = _userId();
     if (userId == null) throw StateError('Sign in first');
@@ -89,6 +90,7 @@ class TransactionCommandsCubit extends Cubit<TransactionCommandState> {
         amountMinor: amountMinor,
         currency: currency,
         note: note,
+        cardId: cardId,
       ),
     );
   }

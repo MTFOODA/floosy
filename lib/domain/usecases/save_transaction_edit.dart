@@ -21,6 +21,7 @@ class TransactionEditDraft {
   final String? merchantName;
   final DateTime transactionDate;
   final String? additionalNote;
+  final String? selectedCardId;
 
   const TransactionEditDraft({
     required this.transaction,
@@ -33,6 +34,7 @@ class TransactionEditDraft {
     required this.merchantName,
     required this.transactionDate,
     this.additionalNote,
+    this.selectedCardId,
   });
 }
 
@@ -104,26 +106,36 @@ class SaveTransactionEdit {
             current.id,
           )
         : null;
-    final currentCardId = current.cardId;
-    if (currentCardId?.isNotEmpty == true) {
-      final linked = (await cardRepository.getCards(
-        userId,
-      )).where((card) => card.id == currentCardId).firstOrNull;
-      if (linked != null) {
-        current = current.copyWith(
-          cardLast4: current.cardLast4 ?? linked.last4,
-        );
-        evidence = TransactionEditEvidence(
-          bankName: evidence?.bankName ?? linked.bankName,
-          typeIdentified: evidence?.typeIdentified ?? true,
-          amountIdentified:
-              evidence?.amountIdentified ?? current.amountMinor > 0,
-          currencyIdentified:
-              evidence?.currencyIdentified ?? current.currency.isNotEmpty,
-        );
-      }
+    final cards = await cardRepository.getCards(userId);
+    final linkedId = current.cardId;
+    final linked = cards.where((card) => card.id == linkedId).firstOrNull;
+    if (linked != null) {
+      current = current.copyWith(cardLast4: current.cardLast4 ?? linked.last4);
+      evidence = TransactionEditEvidence(
+        bankName: evidence?.bankName ?? linked.bankName,
+        typeIdentified: evidence?.typeIdentified ?? true,
+        amountIdentified: evidence?.amountIdentified ?? current.amountMinor > 0,
+        currencyIdentified:
+            evidence?.currencyIdentified ?? current.currency.isNotEmpty,
+      );
     }
-    return TransactionEditPolicy(current, evidence);
+    final rules = TransactionEditPolicy(current, evidence);
+    final knownLast4 = normalizeCardLast4(current.cardLast4);
+    final knownBank = rules.bankName;
+    final options = cards.where((card) {
+      if (linked != null &&
+          rules.transaction.source != TransactionSource.manual) {
+        return false;
+      }
+      if (!rules.bank && knownBank == null) return false;
+      return (knownLast4 == null || card.last4 == knownLast4) &&
+          (knownBank == null || sameIssuingBank(card.bankName, knownBank));
+    }).toList();
+    return TransactionEditPolicy(
+      current,
+      evidence,
+      cardOptions: linked != null && options.length <= 1 ? const [] : options,
+    );
   }
 
   Future<SmartResolutionResult?> save(TransactionEditDraft draft) {
@@ -138,11 +150,18 @@ class SaveTransactionEdit {
   Future<SmartResolutionResult?> _save(TransactionEditDraft draft) async {
     final rules = await policy(draft.transaction);
     final transaction = rules.transaction;
+    final selectedCard = rules.cardOptions
+        .where((card) => card.id == draft.selectedCardId)
+        .firstOrNull;
+    if (draft.selectedCardId != null && selectedCard == null) {
+      throw const TransactionEditFailure('locked');
+    }
     if ((!rules.type && draft.type != transaction.type) ||
         (!rules.amount && draft.amountMinor != transaction.amountMinor) ||
         (!rules.currency && draft.currency != transaction.currency) ||
         !draft.transactionDate.isAtSameMomentAs(transaction.transactionDate) ||
-        (!rules.last4 &&
+        (selectedCard == null &&
+            !rules.last4 &&
             normalizeCardLast4(draft.last4Text) != transaction.cardLast4) ||
         (!rules.category && draft.categoryId != transaction.categoryId) ||
         (!rules.merchant && draft.merchantName != transaction.merchantName)) {
@@ -154,13 +173,10 @@ class SaveTransactionEdit {
     if (!RegExp(r'^[A-Z]{3}$').hasMatch(draft.currency)) {
       throw const TransactionEditFailure('currency');
     }
-    final bankText = draft.bankText.trim();
+    final bankText = (selectedCard?.bankName ?? draft.bankText).trim();
     if (!rules.bank && bankText.isNotEmpty) {
-      final existing = BankCatalog.byIdentity(rules.bankName);
-      final selected = BankCatalog.byIdentity(bankText);
       if (bankText != transaction.bankId &&
-          bankText != rules.bankName &&
-          (existing == null || selected?.code != existing.code)) {
+          !sameIssuingBank(bankText, rules.bankName)) {
         throw const TransactionEditFailure('locked');
       }
     }
@@ -168,7 +184,7 @@ class SaveTransactionEdit {
     // Resolve the bank UUID the transactions table stores. This is display
     // information only and is NOT the card identity.
     String? bankId = transaction.bankId;
-    if (rules.bank && bankText.isNotEmpty) {
+    if (selectedCard == null && rules.bank && bankText.isNotEmpty) {
       List<Bank> known;
       try {
         known = await bankCatalogLoader().timeout(const Duration(seconds: 3));
@@ -198,15 +214,34 @@ class SaveTransactionEdit {
         ? (BankCatalog.byIdentity(bankText)?.name ?? bankText)
         : null;
 
-    final cardLast4 = normalizeCardLast4(draft.last4Text.trim());
+    final cardLast4 =
+        selectedCard?.last4 ?? normalizeCardLast4(draft.last4Text);
     if (draft.last4Text.trim().isNotEmpty && cardLast4 == null) {
       throw const TransactionEditFailure('last4');
     }
-    // The edited row is written WITHOUT relying on the card id the stale
-    // in-memory object carries. The authoritative assignment happens inside the
-    // learning step below, in the SAME commit as the confirmed Last 4. Writing
-    // `updated` (which still has the pre-edit `cardId`) after the identity was
-    // applied is exactly what previously let the old object win.
+    // Manual entries with a typed bank and last four should reuse the existing
+    // identity. A pre-existing duplicate requires the user's explicit choice.
+    final typedMatches =
+        selectedCard == null &&
+            cardLast4 != null &&
+            transaction.source == TransactionSource.manual &&
+            transaction.cardId?.isNotEmpty != true &&
+            (explicitBank ?? rules.bankName) != null
+        ? (await cardRepository.getCards(userId))
+              .where(
+                (card) =>
+                    card.last4 == cardLast4 &&
+                    sameIssuingBank(
+                      card.bankName,
+                      explicitBank ?? rules.bankName,
+                    ),
+              )
+              .toList()
+        : const <DetectedCard>[];
+    if (typedMatches.length > 1) {
+      throw const TransactionEditFailure('chooseCard');
+    }
+    final targetCard = selectedCard ?? typedMatches.firstOrNull;
     final updated = transaction.copyWith(
       type: draft.type,
       amountMinor: draft.amountMinor,
@@ -214,6 +249,7 @@ class SaveTransactionEdit {
       status: transaction.status,
       transactionDate: draft.transactionDate,
       bankId: bankId,
+      cardId: targetCard?.id ?? transaction.cardId,
       // The Last 4 the user typed is persisted on the row even when the bank is
       // unknown: learning then refuses to guess, but the number is kept so the
       // identity can be resolved as soon as a bank is known.
@@ -241,14 +277,21 @@ class SaveTransactionEdit {
         userId,
         transaction.id,
         bankName: explicitBank,
+        cardLast4: selectedCard?.last4,
         type: rules.type ? draft.type : null,
         amountMinor: rules.amount ? draft.amountMinor : null,
         currency: rules.currency ? draft.currency : null,
       );
     }
 
-    SmartResolutionResult? learned;
-    if (cardLast4 != null &&
+    SmartResolutionResult? learned = targetCard == null
+        ? null
+        : SmartResolutionResult(
+            resolution: Resolved(targetCard),
+            transactionAssigned: true,
+          );
+    if (targetCard == null &&
+        cardLast4 != null &&
         (transaction.cardId?.isEmpty != false ||
             rules.last4 ||
             explicitBank != null)) {
@@ -264,7 +307,7 @@ class SaveTransactionEdit {
         userId: userId,
         transactionId: transaction.id,
         last4: cardLast4,
-        bankIdentityOverride: explicitBank,
+        bankIdentityOverride: explicitBank ?? rules.bankName,
       );
       final result = learned;
       {

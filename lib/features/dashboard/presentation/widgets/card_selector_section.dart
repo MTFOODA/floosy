@@ -23,7 +23,7 @@ class DetectedCardsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.s(context);
     final cardsAsync = context.watch<CardsCubit>().state;
-    final selectedLast4 = context.watch<SelectedCardCubit>().state.last4;
+    final selection = context.watch<SelectedCardCubit>().state;
 
     return cardsAsync.when(
       loading: () => const SizedBox.shrink(),
@@ -44,7 +44,7 @@ class DetectedCardsSection extends StatelessWidget {
                           padding: const EdgeInsetsDirectional.only(end: 8),
                           child: ChoiceChip(
                             showCheckmark: false,
-                            selected: _isSelected(context, card, selectedLast4),
+                            selected: _isSelected(selection, card),
                             selectedColor: card.appearance.colors.last
                                 .withValues(alpha: .22),
                             avatar: BankLogo(bankName: card.bankName, size: 22),
@@ -103,191 +103,56 @@ class DetectedCardsSection extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            _buildCardsLayout(context, l, cards, selectedLast4),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = cards.length == 1
+                    ? constraints.maxWidth.clamp(156.0, 220.0).toDouble()
+                    : (constraints.maxWidth * .44)
+                          .clamp(156.0, 224.0)
+                          .toDouble();
+                return SizedBox(
+                  height: width / 1.586 + 24,
+                  child: ListView.separated(
+                    primary: false,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 12,
+                    ),
+                    itemCount: cards.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      final card = cards[index];
+                      return SizedBox(
+                        width: width,
+                        child: SmallDetectedCard(
+                          key: ValueKey(card.id),
+                          card: card,
+                          isSelected: _isSelected(selection, card),
+                          onTap: () =>
+                              context.read<SelectedCardCubit>().setSelectedCard(
+                                card.last4,
+                                bankName: card.bankName,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildSingleCard(
-    BuildContext context,
-    AppLocalizations l,
-    DetectedCard card,
-    String? selectedLast4,
-  ) {
-    final isSelected = _isSelected(context, card, selectedLast4);
-    return SizedBox(
-      width: 220,
-      child: _buildCardItem(context, l, card, isSelected, scale: 1.0),
-    );
-  }
-
-  /// Dynamically adapts the layout to the actual number of detected cards:
-  /// 1 card -> full-width, 2 -> side by side, 3 -> scaled single row,
-  /// 4 -> compact 2x2 grid, 5+ -> horizontally scrollable row.
-  Widget _buildCardsLayout(
-    BuildContext context,
-    AppLocalizations l,
-    List<DetectedCard> cards,
-    String? selectedLast4,
-  ) {
-    if (cards.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Text(
-            l['noCardsDetected'],
-            style: TextStyle(color: context.fc.textSecondary, fontSize: 14),
-          ),
-        ),
-      );
-    }
-
-    if (cards.length == 1) {
-      return _buildSingleCard(context, l, cards.first, selectedLast4);
-    } else if (cards.length == 2) {
-      return _buildTwoCards(context, l, cards, selectedLast4);
-    } else if (cards.length == 3) {
-      return _buildThreeCards(context, l, cards, selectedLast4);
-    } else if (cards.length == 4) {
-      return _buildFourCards(context, l, cards, selectedLast4);
-    } else {
-      return _buildScrollableCards(context, l, cards, selectedLast4);
-    }
-  }
-
-  Widget _buildTwoCards(
-    BuildContext context,
-    AppLocalizations l,
-    List<DetectedCard> cards,
-    String? selectedLast4,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: Row(
-        children: cards.map((card) {
-          final isSelected = _isSelected(context, card, selectedLast4);
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: _buildCardItem(context, l, card, isSelected, scale: 1.0),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildThreeCards(
-    BuildContext context,
-    AppLocalizations l,
-    List<DetectedCard> cards,
-    String? selectedLast4,
-  ) {
-    return Row(
-      children: cards.map((card) {
-        final isSelected = _isSelected(context, card, selectedLast4);
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: _buildCardItem(context, l, card, isSelected, scale: 0.82),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildFourCards(
-    BuildContext context,
-    AppLocalizations l,
-    List<DetectedCard> cards,
-    String? selectedLast4,
-  ) {
-    return Column(
-      children: [
-        Row(
-          children: cards.take(2).map((card) {
-            final isSelected = _isSelected(context, card, selectedLast4);
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: _buildCardItem(context, l, card, isSelected, scale: 0.7),
-              ),
-            );
-          }).toList(),
-        ),
-        Row(
-          children: cards.skip(2).take(2).map((card) {
-            final isSelected = _isSelected(context, card, selectedLast4);
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: _buildCardItem(context, l, card, isSelected, scale: 0.7),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScrollableCards(
-    BuildContext context,
-    AppLocalizations l,
-    List<DetectedCard> cards,
-    String? selectedLast4,
-  ) {
-    return SizedBox(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        itemCount: cards.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final card = cards[index];
-          final isSelected = _isSelected(context, card, selectedLast4);
-          return _buildCardItem(context, l, card, isSelected, scale: 0.8);
-        },
-      ),
-    );
-  }
-
-  bool _isSelected(
-    BuildContext context,
-    DetectedCard card,
-    String? selectedLast4,
-  ) {
-    final selection = context.read<SelectedCardCubit>().state;
+  bool _isSelected(CardSelection selection, DetectedCard card) {
     if (selection.requiresChoice) return false;
     final selectedBankName = selection.bankName;
     final selectedBankIdentity = normalizeBankIdentity(selectedBankName);
-    return card.last4 == selectedLast4 &&
+    return card.last4 == selection.last4 &&
         (selectedBankIdentity == null ||
             normalizeBankIdentity(card.bankName) == selectedBankIdentity);
-  }
-
-  Widget _buildCardItem(
-    BuildContext context,
-    AppLocalizations l,
-    DetectedCard card,
-    bool isSelected, {
-    double scale = 1.0,
-  }) {
-    return Transform.scale(
-      scale: scale,
-      child: SmallDetectedCard(
-        card: card,
-        isSelected: isSelected,
-        onTap: () {
-          context.read<SelectedCardCubit>().setSelectedCard(
-            card.last4,
-            bankName: card.bankName,
-          );
-        },
-      ),
-    );
   }
 }

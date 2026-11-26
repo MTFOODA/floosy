@@ -11,7 +11,6 @@ import '../widgets/card_customization_sheet.dart';
 import '../../../dashboard/presentation/cubit/finance_cubit.dart';
 import '../../../dashboard/presentation/cubit/salary_plan_cubit.dart';
 import '../../../dashboard/presentation/widgets/salary_setup_dialog.dart';
-import '../../../../core/localization/preferences_cubit.dart';
 
 /// "Detected Cards" page (requirement #6). Accessible from Settings.
 class DetectedCardsScreen extends StatelessWidget {
@@ -118,7 +117,7 @@ class DetectedCardsScreen extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => _openSalarySetup(context, card),
                       icon: const Icon(Icons.payments_outlined, size: 18),
-                      label: Text(l['salaryCycle']),
+                      label: Text(l['cardBalanceAndSalary']),
                     ),
                   ),
                 ],
@@ -153,22 +152,47 @@ class DetectedCardsScreen extends StatelessWidget {
 
   Future<void> _openSalarySetup(BuildContext context, DetectedCard card) async {
     if (card.isCreditCard) return;
-    await context.read<SelectedCardCubit>().setSelectedCard(
-      card.last4,
-      bankName: card.bankName,
-    );
+    final cards = context.read<CardsCubit>();
     final finance = context.read<FinanceCubit>();
     final salary = context.read<SalaryPlanCubit>();
-    await finance.reload();
-    await salary.reload();
-    if (!context.mounted) return;
-    final snapshot = finance.state.value;
-    if (snapshot?.card?.id != card.id) return;
-    await showSalarySetupDialog(
-      context,
-      currentBalanceMinor: snapshot?.summary.myBalanceMinor ?? 0,
-      existing: salary.state.value?.plan,
-    );
+    try {
+      final currentBalance = await finance.currentBalanceForCard(card);
+      final existing = await salary.planFor(card);
+      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      await showSalarySetupDialog(
+        context,
+        currentBalanceMinor: currentBalance,
+        existing: existing,
+        onSave: (balance, amount, day, detect) async {
+          final fresh = await cards.getCardById(card.userId, card.id);
+          if (fresh == null || fresh.isCreditCard) {
+            throw StateError('The debit card is no longer available');
+          }
+          if (balance != currentBalance) {
+            await finance.setCurrentBalanceForCard(
+              userId: fresh.userId,
+              cardLast4: fresh.last4,
+              bankName: fresh.bankName,
+              targetBalanceMinor: balance,
+            );
+          }
+          if (amount != null) {
+            await salary.configure(
+              card: fresh,
+              monthlySalaryMinor: amount,
+              cycleStartDay: day,
+              startingBalanceMinor: balance,
+              autoDetectSalary: detect,
+            );
+          }
+        },
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.s(context)['errorLoading'])),
+      );
+    }
   }
 }
 

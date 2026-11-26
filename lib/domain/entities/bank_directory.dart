@@ -110,6 +110,8 @@ class BankCatalog {
       domain: 'faisalbank.com.eg',
       aliases: [
         'Faisal Bank',
+        'Faisal Islamic Bank',
+        'Faisal Islamic Bank of',
         'بنك فيصل',
         'Faisal Islamic Bank of Egypt',
         'FIBE',
