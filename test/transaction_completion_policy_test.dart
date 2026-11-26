@@ -10,6 +10,7 @@ import 'package:floosy/domain/entities/transaction_edit_policy.dart';
 import 'package:floosy/domain/entities/user_model.dart';
 import 'package:floosy/domain/usecases/save_transaction_edit.dart';
 import 'package:floosy/domain/usecases/create_manual_transaction.dart';
+import 'package:floosy/domain/usecases/remove_empty_duplicate_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -187,6 +188,7 @@ void main() {
       final duplicate = card.copyWith(
         id: 'legacy',
         bankName: 'faisal islamic bank of',
+        createdAt: card.createdAt.add(const Duration(minutes: 1)),
       );
       await deps.detectedCardLocalDataSource.saveCards('u', [card, duplicate]);
       final tx = Transaction(
@@ -201,6 +203,13 @@ void main() {
         transactionDate: DateTime(2026, 11, 26),
       );
       await deps.transactionRepository.createTransaction(transaction: tx);
+      final remove = RemoveEmptyDuplicateCard(
+        deps.detectedCardRepository,
+        deps.transactionRepository,
+        deps.salaryRepository,
+      );
+      expect(await remove('u', card.id), isFalse);
+      expect(await remove('u', duplicate.id), isFalse);
       final policy = await editor.policy(tx);
       expect(
         policy.cardOptions.map((c) => c.id),
@@ -229,6 +238,17 @@ void main() {
           bankName: duplicate.bankName,
         )).myBalanceMinor,
         0,
+      );
+      expect(await remove('u', duplicate.id), isTrue);
+      expect(
+        (await deps.detectedCardRepository.getCards('u')).single.id,
+        card.id,
+      );
+      expect(
+        (await deps.transactionRepository.getTransactions(
+          userId: 'u',
+        )).single.cardId,
+        card.id,
       );
     },
   );

@@ -1,7 +1,11 @@
 import '../entities/salary_plan.dart';
 
 abstract interface class SalaryPlanRepository {
-  Future<SalaryPlan?> getPlan(String userId, {required String cardId});
+  Future<SalaryPlan?> getPlan(
+    String userId, {
+    required String cardId,
+    bool migrateLegacy = true,
+  });
 
   Future<void> configure(
     String userId, {

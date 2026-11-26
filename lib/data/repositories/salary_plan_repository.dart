@@ -29,7 +29,11 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
   );
 
   @override
-  Future<SalaryPlan?> getPlan(String userId, {required String cardId}) async {
+  Future<SalaryPlan?> getPlan(
+    String userId, {
+    required String cardId,
+    bool migrateLegacy = true,
+  }) async {
     final stored = await _records.get(_activeKind, _planId(cardId));
     if (stored != null) return SalaryPlan.fromJson(stored);
 
@@ -40,6 +44,7 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
     if (legacy == null) return null;
     final plan = SalaryPlan.fromJson(legacy);
     if (plan.cardId != null && plan.cardId != cardId) return null;
+    if (!migrateLegacy) return plan;
     final migrated = SalaryPlan(
       cardId: cardId,
       cardLast4: plan.cardLast4,
@@ -82,8 +87,7 @@ class LocalSalaryPlanRepository implements SalaryPlanRepository {
       autoDetectSalary: autoDetectSalary,
       effectiveFrom: base,
     );
-    final historyId =
-        'plan-$cardId-${base.toUtc().millisecondsSinceEpoch}';
+    final historyId = 'plan-$cardId-${base.toUtc().millisecondsSinceEpoch}';
     await _records.put(_historyKind, plan.toJson(historyId));
     await _records.put(_activeKind, plan.toJson(_planId(cardId)));
   }

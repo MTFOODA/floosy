@@ -2,6 +2,7 @@ import 'data_preparation_cubit.dart';
 import 'package:uuid/uuid.dart';
 import '../domain/usecases/create_manual_transaction.dart';
 import '../domain/usecases/delete_transaction.dart';
+import '../domain/usecases/remove_empty_duplicate_card.dart';
 import '../domain/usecases/get_financial_overview.dart';
 import '../features/ai/presentation/cubit/ai_chat_cubit.dart';
 import '../domain/usecases/save_transaction_edit.dart';
@@ -58,6 +59,15 @@ class AppRuntime {
   final Duration preparationTimeout;
   final Map<String, Future<void>> _preparations = {};
   final AppRepositories repositories;
+  late final _removeDuplicate = RemoveEmptyDuplicateCard(
+    repositories.cards,
+    repositories.transactions,
+    repositories.salary,
+  );
+
+  Future<bool> removeEmptyDuplicateCard(String cardId) =>
+      withSmsSuspended(() => _removeDuplicate(_userId()!, cardId));
+
   late final auth = AuthCubit(repositories.auth);
   late final locale = LocaleCubit(repositories.preferences);
   late final theme = ThemeModeCubit(repositories.preferences);
@@ -148,10 +158,12 @@ class AppRuntime {
   }) {
     _subscriptions.add(auth.stream.listen(_authenticationChanged));
     _subscriptions.add(refresh.stream.listen((_) => reload()));
-    _subscriptions.add(selection.stream.listen((_) async {
-      await finance.reload();
-      await salary.reload();
-    }));
+    _subscriptions.add(
+      selection.stream.listen((_) async {
+        await finance.reload();
+        await salary.reload();
+      }),
+    );
     _subscriptions.add(
       cards.stream.listen((state) async {
         if (state.isLoading || state.hasError || _userId() == null) return;

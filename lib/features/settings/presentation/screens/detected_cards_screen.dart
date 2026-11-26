@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../app/app_runtime.dart';
+import '../../../../domain/usecases/remove_empty_duplicate_card.dart';
 import '../../../../domain/entities/bank_directory.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:floosy/features/settings/presentation/cubit/cards_cubit.dart';
@@ -121,6 +123,16 @@ class DetectedCardsScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (RemoveEmptyDuplicateCard.isNewerDuplicate(card, cards))
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          _confirmDuplicateRemoval(context, l, card),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: Text(l['removeDuplicateCard']),
+                    ),
+                  ),
                 const SizedBox(height: 6),
                 Text(
                   '${card.bankName == null ? AppLocalizations.s(context)['bankUnknown'] : BankCatalog.displayName(card.bankName, arabic: AppLocalizations.s(context).isArabic)} •••• ${card.last4}',
@@ -132,6 +144,55 @@ class DetectedCardsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDuplicateRemoval(
+    BuildContext context,
+    AppLocalizations l,
+    DetectedCard card,
+  ) async {
+    final runtime = context.read<AppRuntime>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l['removeDuplicateCard']),
+        content: Text(
+          l.t('removeDuplicateCardBody', {
+            'bank': BankCatalog.displayName(card.bankName, arabic: l.isArabic),
+            'last4': card.last4,
+          }),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l['cancel']),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l['delete']),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      final removed = await runtime.removeEmptyDuplicateCard(card.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l[removed ? 'duplicateCardRemoved' : 'duplicateCardHasData'],
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l['saveFailed'])));
+      }
+    }
   }
 
   Future<void> _openCustomization(
